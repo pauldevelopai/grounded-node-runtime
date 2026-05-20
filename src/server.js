@@ -27,6 +27,7 @@
 import express from "express";
 import multer from "multer";
 import { mountChrome, readRuntimeVersion } from "./chrome.js";
+import { syncFile, catchupPush } from "./git-sync.js";
 
 export function createServer({
   slug,
@@ -100,6 +101,27 @@ export function createServer({
     });
   }
 
+  // ── Feedback — newsroom-typed free-text content. The local write
+  // always succeeds; the git push is best-effort with a hard timeout
+  // so the modal isn't held hostage by a slow network. The response
+  // tells the frontend which state we ended in.
+  app.post("/api/grounded/feedback", async (req, res) => {
+    try {
+      const { type, message, page } = req.body || {};
+      const { file } = await host.feedback.submit({ type, message, page });
+      await host.log.run({ op: "feedback_submit", type: type || "other" }).catch(() => {});
+      const sync = await syncFile(file, `feedback: ${type || "other"}`);
+      res.json({
+        saved: true,
+        synced: sync.step === "pushed",
+        sync_step: sync.step,
+        sync_reason: sync.reason || null,
+      });
+    } catch (e) {
+      res.status(400).json({ saved: false, error: e.message || "feedback failed" });
+    }
+  });
+
   const banner = displayName || slug;
   app.listen(port, () => {
     console.log("");
@@ -109,6 +131,17 @@ export function createServer({
     console.log("  Press Ctrl+C in this window to stop it.");
     console.log("");
   });
+
+  // Boot catchup: 3 seconds after start, try to push any feedback
+  // commits that didn't make it to origin last time (offline at the
+  // moment of submission). Silent on failure — this is best-effort.
+  setTimeout(() => {
+    catchupPush().then((r) => {
+      if (r.ok && r.step === "pushed") {
+        console.log(`[grounded] catchup-pushed ${r.count} pending commit(s)`);
+      }
+    }).catch(() => { /* silent */ });
+  }, 3000);
 
   return app;
 }

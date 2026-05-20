@@ -261,6 +261,34 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
         stack_first_line: error?.stack ? String(error.stack).split("\n")[1]?.trim() || null : null,
         context: sanitiseContext(context)
       })
+    },
+
+    // ── Feedback — the only host channel that intentionally carries
+    // user-typed free-text content. The frontend shows an upfront
+    // privacy notice; this writer just persists what arrives. The
+    // server wraps this with the git-sync step.
+    feedback: {
+      submit: async ({ type, message, page }) => {
+        const cleanType = ["bug", "suggestion", "praise", "question"].includes(type) ? type : "other";
+        const cleanMessage = String(message || "").slice(0, 4000).trim();
+        if (!cleanMessage) throw new Error("Empty feedback message");
+        const file = tableFile(`${prefix}feedback`);
+        const log = readJson(file, []);
+        const entry = {
+          ts: new Date().toISOString(),
+          newsroom_id: ctx.newsroomId,
+          host_id: meta.host_id,
+          node_version: meta.node_version,
+          runtime_version: meta.runtime_version,
+          newsroom: meta.newsroom,
+          type: cleanType,
+          message: cleanMessage,
+          page: String(page || "").slice(0, 200) || null,
+        };
+        log.push(entry);
+        writeJson(file, log);
+        return { file, entry };
+      }
     }
   };
 
