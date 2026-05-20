@@ -26,6 +26,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import mammoth from "mammoth";
 
 const DEFAULT_DATA_DIR = "data/processed";
@@ -122,9 +123,83 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR } = {}) {
     return { rows: [] };
   }
 
-  const client = process.env.ANTHROPIC_API_KEY
-    ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    : null;
+  // ── AI: provider-flexible. Auto-detects which provider to use based on
+  //    whichever API key is in the environment. Override explicitly with
+  //    AI_PROVIDER=anthropic|openai. Model defaults are deliberately cheap;
+  //    override per-call via opts.model or globally via MODEL env var.
+  //    OPENAI_BASE_URL points the OpenAI SDK at OpenRouter/Groq/Ollama if you
+  //    want a third path.
+  function inferProvider() {
+    const explicit = (process.env.AI_PROVIDER || "").toLowerCase().trim();
+    if (explicit === "anthropic" || explicit === "openai") return explicit;
+    if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+    if (process.env.OPENAI_API_KEY) return "openai";
+    return "anthropic";
+  }
+  function defaultModel(provider) {
+    if (process.env.MODEL) return process.env.MODEL;
+    return provider === "openai" ? "gpt-5.4-mini" : "claude-haiku-4-5";
+  }
+  let anthropicClient = null, openaiClient = null;
+  function getAnthropic() {
+    if (!anthropicClient) {
+      if (!process.env.ANTHROPIC_API_KEY) {
+        throw new Error(
+          "AI_PROVIDER is 'anthropic' but ANTHROPIC_API_KEY is not set — " +
+          "check your .env file (or set AI_PROVIDER=openai if that's the key you have)"
+        );
+      }
+      anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    }
+    return anthropicClient;
+  }
+  function getOpenAI() {
+    if (!openaiClient) {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error(
+          "AI_PROVIDER is 'openai' but OPENAI_API_KEY is not set — " +
+          "check your .env file (or set AI_PROVIDER=anthropic if that's the key you have)"
+        );
+      }
+      openaiClient = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+        ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {})
+      });
+    }
+    return openaiClient;
+  }
+
+  async function chat(input, opts = {}) {
+    const provider = inferProvider();
+    const model = opts.model || defaultModel(provider);
+    const messages = typeof input === "string"
+      ? [{ role: "user", content: input }] : input;
+
+    if (provider === "openai") {
+      const client = getOpenAI();
+      const messagesForOpenAI = opts.system
+        ? [{ role: "system", content: opts.system }, ...messages]
+        : messages;
+      const r = await client.chat.completions.create({
+        model,
+        max_completion_tokens: opts.maxTokens || 1000,
+        messages: messagesForOpenAI
+      });
+      const text = (r.choices[0]?.message?.content || "").trim();
+      return { text, provider, model, usedFallback: false };
+    }
+
+    const client = getAnthropic();
+    const msg = await client.messages.create({
+      model,
+      max_tokens: opts.maxTokens || 1000,
+      ...(opts.system ? { system: opts.system } : {}),
+      messages
+    });
+    const text = msg.content
+      .filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+    return { text, provider, model, usedFallback: false };
+  }
 
   return {
     ctx,
@@ -135,32 +210,33 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR } = {}) {
       tx: async fn => fn({ query })
     },
 
-    ai: {
-      chat: async (input, opts = {}) => {
-        if (!client) {
-          throw new Error("ANTHROPIC_API_KEY is not set — see your .env file");
-        }
-        const messages = typeof input === "string"
-          ? [{ role: "user", content: input }] : input;
-        const msg = await client.messages.create({
-          model: process.env.MODEL || "claude-haiku-4-5",
-          max_tokens: opts.maxTokens || 1000,
-          ...(opts.system ? { system: opts.system } : {}),
-          messages
-        });
-        const text = msg.content
-          .filter(b => b.type === "text").map(b => b.text).join("\n").trim();
-        return { text, usedFallback: false };
-      }
-    },
+    ai: { chat },
 
     parse: {
       docxToHtml: async buffer => (await mammoth.convertToHtml({ buffer })).value
     },
 
     log: {
-      run:  async meta => console.log("[node:run]",  JSON.stringify(meta)),
-      edit: async meta => console.log("[node:edit]", JSON.stringify(meta))
+      // Append-only activity log. Lands in data/processed/<prefix>activity.json
+      // so it's committed to the newsroom's fork along with their other data
+      // (per the "data is shared for training" decision). Schema is flat and
+      // forward-compatible — new fields can be added without breaking the
+      // harvest script.
+      run:  async meta => appendActivity({ kind: "run",  ...meta }),
+      edit: async meta => appendActivity({ kind: "edit", ...meta })
     }
   };
+
+  function appendActivity(entry) {
+    const file = tableFile(`${prefix}activity`);
+    const log = readJson(file, []);
+    log.push({
+      ts: new Date().toISOString(),
+      newsroom_id: ctx.newsroomId,
+      ...entry
+    });
+    writeJson(file, log);
+    // Also echo to terminal so the newsroom dev can watch live.
+    console.log(`[${entry.kind || "log"}]`, JSON.stringify(entry));
+  }
 }
