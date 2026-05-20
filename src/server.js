@@ -26,12 +26,14 @@
 
 import express from "express";
 import multer from "multer";
+import { mountChrome, readRuntimeVersion } from "./chrome.js";
 
 export function createServer({
   slug,
   host,
   handlers = {},
   displayName,
+  nodeVersion,
   port = process.env.PORT || 3000,
   staticDir = "public",
   uploadLimitMb = 25
@@ -43,9 +45,33 @@ export function createServer({
   app.use(express.json());
   app.use(express.static(staticDir));
 
+  // GROUNDED chrome — family branding + telemetry endpoint. Nodes opt in
+  // via two <link>/<script> lines in their HTML; this just makes the
+  // assets and the meta endpoint available.
+  mountChrome(app, {
+    slug,
+    displayName: displayName || slug,
+    nodeVersion: nodeVersion || host?.meta?.node_version || "unknown",
+    runtimeVersion: readRuntimeVersion(),
+    hostId: host?.meta?.host_id || null,
+    newsroom: host?.meta?.newsroom || null,
+  });
+
   const wrap = fn => async (req, res) => {
     try { res.json(await fn(host, req.body || req.query || {})); }
-    catch (e) { res.status(500).json({ error: e.message || "node error" }); }
+    catch (e) {
+      res.status(500).json({ error: e.message || "node error" });
+      // Fire-and-forget: log the error to the structured error feed so
+      // the cohort dashboard picks it up. Never throws — if logging
+      // itself fails, swallow it rather than crash the response.
+      try {
+        host.log?.error?.({
+          op: req.path,
+          error: e,
+          context: { method: req.method, query_keys: Object.keys(req.query || {}) }
+        });
+      } catch { /* swallowed */ }
+    }
   };
 
   if (handlers.getSetupStatus) app.get("/api/setup",   wrap(h => handlers.getSetupStatus(h)));

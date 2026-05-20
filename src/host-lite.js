@@ -25,9 +25,12 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { randomUUID } from "node:crypto";
+import os from "node:os";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import mammoth from "mammoth";
+import { readRuntimeVersion } from "./chrome.js";
 
 const DEFAULT_DATA_DIR = "data/processed";
 const STANDALONE_NEWSROOM_ID = "local";
@@ -38,7 +41,7 @@ const writeJson = (file, d)  => {
   writeFileSync(file, JSON.stringify(d, null, 1));
 };
 
-export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR } = {}) {
+export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersion, newsroom } = {}) {
   if (!appSlug) throw new Error("createLiteHost: appSlug is required");
   if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
 
@@ -50,6 +53,26 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR } = {}) {
   });
 
   const tableFile = name => join(dataDir, `${name}.json`);
+  const runtimeVersion = readRuntimeVersion();
+
+  // ── Boot beacon: sticky install identity + version + activity heartbeat.
+  // Committed to the newsroom's fork like the activity log; the cohort
+  // harvest reads it to populate the install matrix on the GROUNDED
+  // dashboard. Schema is flat and forward-compatible.
+  const metaFile = tableFile(`${prefix}meta`);
+  const prevMeta = readJson(metaFile, null);
+  const meta = {
+    slug: appSlug,
+    host_id: prevMeta?.host_id || randomUUID(),
+    node_version: nodeVersion || prevMeta?.node_version || "unknown",
+    runtime_version: runtimeVersion,
+    newsroom: newsroom || prevMeta?.newsroom || null,
+    platform: prevMeta?.platform || `${os.platform()} ${os.arch()} node ${process.version}`,
+    first_boot: prevMeta?.first_boot || new Date().toISOString(),
+    last_boot: new Date().toISOString(),
+    boot_count: (prevMeta?.boot_count || 0) + 1
+  };
+  writeJson(metaFile, meta);
 
   function assertOwned(table) {
     if (!table.startsWith(prefix)) {
@@ -204,6 +227,7 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR } = {}) {
   return {
     ctx,
     tablePrefix: prefix,
+    meta,  // sticky install identity — server reads this for /api/grounded/meta
 
     db: {
       query,
@@ -222,10 +246,54 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR } = {}) {
       // (per the "data is shared for training" decision). Schema is flat and
       // forward-compatible — new fields can be added without breaking the
       // harvest script.
-      run:  async meta => appendActivity({ kind: "run",  ...meta }),
-      edit: async meta => appendActivity({ kind: "edit", ...meta })
+      run:  async metaArg => appendActivity({ kind: "run",  ...metaArg }),
+      edit: async metaArg => appendActivity({ kind: "edit", ...metaArg }),
+
+      // Structured error log. Separate file so dashboard can show
+      // problems independently from successful activity. Aggressive
+      // sanitisation: callers should pass operation name + error
+      // message + small structured context, NEVER claim text, post
+      // text, image data, API keys, or user-identifying content.
+      error: async ({ op, error, context }) => appendError({
+        op: op || "unknown",
+        message: error?.message || String(error || "(no message)"),
+        name: error?.name || null,
+        stack_first_line: error?.stack ? String(error.stack).split("\n")[1]?.trim() || null : null,
+        context: sanitiseContext(context)
+      })
     }
   };
+
+  function sanitiseContext(ctx) {
+    if (!ctx || typeof ctx !== "object") return null;
+    // Allow only short scalar values. Strings cap at 200 chars. No
+    // nested objects, no arrays of objects, no keys named like
+    // they carry sensitive content.
+    const blocked = /text|content|body|claim|post|image|key|token|password|secret|email/i;
+    const out = {};
+    for (const [k, v] of Object.entries(ctx)) {
+      if (blocked.test(k)) continue;
+      if (v == null) { out[k] = null; continue; }
+      if (typeof v === "boolean" || typeof v === "number") { out[k] = v; continue; }
+      if (typeof v === "string") { out[k] = v.length > 200 ? v.slice(0, 200) + "…" : v; continue; }
+      // skip anything else (objects, arrays, functions)
+    }
+    return out;
+  }
+
+  function appendError(entry) {
+    const file = tableFile(`${prefix}errors`);
+    const log = readJson(file, []);
+    log.push({
+      ts: new Date().toISOString(),
+      newsroom_id: ctx.newsroomId,
+      host_id: meta.host_id,
+      node_version: meta.node_version,
+      ...entry
+    });
+    writeJson(file, log);
+    console.error(`[error]`, JSON.stringify(entry));
+  }
 
   function appendActivity(entry) {
     const file = tableFile(`${prefix}activity`);
@@ -233,6 +301,8 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR } = {}) {
     log.push({
       ts: new Date().toISOString(),
       newsroom_id: ctx.newsroomId,
+      host_id: meta.host_id,
+      node_version: meta.node_version,
       ...entry
     });
     writeJson(file, log);

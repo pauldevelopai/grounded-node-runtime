@@ -53,6 +53,75 @@ function is exported:
 A Node that doesn't accept uploads simply doesn't export `postIngest` — that
 route stays unmounted.
 
+## Family chrome (subtle GROUNDED branding)
+
+Every Node is part of the GROUNDED family. The runtime ships a small
+chrome — a single fixed-position footer line at the bottom of the page
+with the GROUNDED wordmark, Node name, version, and runtime version.
+Subtle by design: the Node's own branding stays primary.
+
+Nodes opt in by adding two lines to `public/index.html`:
+
+```html
+<link rel="stylesheet" href="/grounded-chrome.css" />
+<script src="/grounded-chrome.js" defer></script>
+```
+
+The chrome reads `/api/grounded/meta` (auto-mounted) to populate version
+info. For best display, pass `nodeVersion` and optionally `newsroom` to
+`createLiteHost`:
+
+```js
+import pkg from "./package.json" with { type: "json" };
+
+createServer({
+  slug: "my-node",
+  host: createLiteHost({
+    appSlug: "my-node",
+    nodeVersion: pkg.version,
+    newsroom: "Capital FM",        // optional
+  }),
+  handlers,
+  displayName: "My Node",
+});
+```
+
+## Telemetry — the boot beacon, activity log, and error log
+
+On every boot, `createLiteHost` writes a meta file capturing install
+identity and version state:
+
+```
+data/processed/node_<slug>_meta.json
+{
+  "slug": "my-node",
+  "host_id": "<sticky UUID — generated once per install>",
+  "node_version": "0.2.0",
+  "runtime_version": "0.5.0",
+  "newsroom": "Capital FM",
+  "platform": "darwin arm64 node v20.10.0",
+  "first_boot": "2026-05-20T11:00:00.000Z",
+  "last_boot": "2026-05-20T14:32:11.000Z",
+  "boot_count": 17
+}
+```
+
+Three log surfaces are committed to the newsroom's fork alongside the
+activity log. Together they feed the cohort dashboard in `groundedai/`:
+
+| File | Written by | Purpose |
+|---|---|---|
+| `node_<slug>_meta.json` | runtime, every boot | install identity + version + activity heartbeat |
+| `node_<slug>_activity.json` | `host.log.run/edit` | append-only feed of every action |
+| `node_<slug>_errors.json` | `host.log.error` | structured errors with sanitised context |
+
+`host.log.error({ op, error, context })` aggressively sanitises the
+`context` field — never log claim text, post text, image data, API
+keys, or anything user-identifying. The sanitiser drops any key
+matching `text|content|body|claim|post|image|key|token|password|secret|email`
+and caps strings at 200 characters. Pass small structured metadata
+(operation name, file size, parse step) — not raw payloads.
+
 ## The host interface (the contract)
 
 Application code targets this interface. The runtime's `createLiteHost` is one
@@ -69,6 +138,8 @@ the host), `$2..$N` = user params.
 | `host.ai.chat(input, opts)` | Claude call. **No model parameter** — locked to Haiku in integrated mode. |
 | `host.parse.docxToHtml(buffer)` | Word `.docx` → HTML for table extraction |
 | `host.log.run(meta)` / `host.log.edit(meta)` | Telemetry (console in standalone, Observatory integrated) |
+| `host.log.error({ op, error, context })` | Structured error log with sanitised context — feeds the cohort dashboard |
+| `host.meta` | Sticky install identity (host_id, versions, boot_count) — read-only |
 
 ## Graduation into GROUNDED
 
