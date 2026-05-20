@@ -48,11 +48,13 @@ export function createServer({
     catch (e) { res.status(500).json({ error: e.message || "node error" }); }
   };
 
-  if (handlers.listSources) app.get("/api/sources",  wrap(h => handlers.listSources(h)));
-  if (handlers.getReport)   app.get("/api/report",   wrap((h, q) => handlers.getReport(h, q)));
-  if (handlers.getQuality)  app.get("/api/quality",  wrap((h, q) => handlers.getQuality(h, q)));
-  if (handlers.getActivity) app.get("/api/activity", wrap(h => handlers.getActivity(h)));
-  if (handlers.postBrief)   app.post("/api/brief",   wrap((h, b) => handlers.postBrief(h, b)));
+  if (handlers.getSetupStatus) app.get("/api/setup",   wrap(h => handlers.getSetupStatus(h)));
+  if (handlers.postSetup)      app.post("/api/setup",  wrap((h, b) => handlers.postSetup(h, b)));
+  if (handlers.listSources)    app.get("/api/sources",  wrap(h => handlers.listSources(h)));
+  if (handlers.getReport)      app.get("/api/report",   wrap((h, q) => handlers.getReport(h, q)));
+  if (handlers.getQuality)     app.get("/api/quality",  wrap((h, q) => handlers.getQuality(h, q)));
+  if (handlers.getActivity)    app.get("/api/activity", wrap(h => handlers.getActivity(h)));
+  if (handlers.postBrief)      app.post("/api/brief",   wrap((h, b) => handlers.postBrief(h, b)));
 
   if (handlers.postIngest) {
     const upload = multer({
