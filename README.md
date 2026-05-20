@@ -28,37 +28,75 @@ my-node/
 
 ```js
 // index.js — the entire boot
+import "dotenv/config";
 import { createLiteHost, createServer } from "@developai/grounded-node-runtime";
 import * as handlers from "./lib/handlers.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
+
+const SLUG = "my-node";
 
 createServer({
-  slug: "my-node",
-  host: createLiteHost({ appSlug: "my-node" }),
+  slug: SLUG,
+  host: createLiteHost({
+    appSlug: SLUG,
+    nodeVersion: pkg.version,
+    newsroom: process.env.NEWSROOM || "My Newsroom",
+  }),
   handlers,
-  displayName: "My Node"
+  displayName: "My Node",
+  nodeVersion: pkg.version,
 });
 ```
+
+A few details about that boot:
+
+- `nodeVersion` is read from the Node's own `package.json` and threaded
+  into both `createLiteHost` (so the boot beacon records it) and
+  `createServer` (so the GROUNDED chrome at `/api/grounded/meta`
+  displays it). Same value in both places.
+- `newsroom` falls back to `process.env.NEWSROOM` so each newsroom can
+  set their own name in their local `.env` without forking a per-newsroom
+  copy of `index.js`. The default string is a sensible last resort.
+- `"dotenv/config"` is imported at the top so `process.env` is populated
+  from `.env` before any of the boot reads it.
 
 The runtime auto-mounts a handler at its standard route if the matching
 function is exported:
 
 | Export | Route | Method |
 |---|---|---|
-| `listSources` | `/api/sources` | GET |
-| `getReport`   | `/api/report`  | GET |
-| `getQuality`  | `/api/quality` | GET |
-| `postBrief`   | `/api/brief`   | POST |
-| `postIngest`  | `/api/ingest`  | POST (multipart, field `file`) |
+| `getSetupStatus` | `/api/setup` | GET — current API-key state |
+| `postSetup`      | `/api/setup` | POST — save chosen provider + key (Node-implemented) |
+| `listSources`    | `/api/sources` | GET |
+| `getReport`      | `/api/report`  | GET |
+| `getQuality`     | `/api/quality` | GET |
+| `getActivity`    | `/api/activity` | GET |
+| `postBrief`      | `/api/brief`   | POST |
+| `postIngest`     | `/api/ingest`  | POST (multipart, field `file`) |
 
 A Node that doesn't accept uploads simply doesn't export `postIngest` — that
-route stays unmounted.
+route stays unmounted. The `getSetupStatus` / `postSetup` pair is the
+in-app API-key flow: the Node writes to `.env` itself (the runtime
+doesn't ship a setup interface). See `node-makanday-analytics/lib/handlers.js`
+or `node-capitalfm-verifier/lib/handlers.js` for the canonical
+implementation.
+
+The runtime also auto-mounts three GROUNDED chrome routes that every
+Node gets for free: `/grounded-chrome.css`, `/grounded-chrome.js`, and
+`/api/grounded/meta`. See the next section.
 
 ## Family chrome (subtle GROUNDED branding)
 
 Every Node is part of the GROUNDED family. The runtime ships a small
-chrome — a single fixed-position footer line at the bottom of the page
-with the GROUNDED wordmark, Node name, version, and runtime version.
-Subtle by design: the Node's own branding stays primary.
+chrome — a thin terracotta top bar with the GROUNDED wordmark +
+newsroom name, plus a footer line with the Node name, Node version,
+runtime version, and newsroom. Subtle by design: the Node's own
+branding stays primary, GROUNDED is the family signature.
 
 Nodes opt in by adding two lines to `public/index.html`:
 
@@ -67,24 +105,13 @@ Nodes opt in by adding two lines to `public/index.html`:
 <script src="/grounded-chrome.js" defer></script>
 ```
 
-The chrome reads `/api/grounded/meta` (auto-mounted) to populate version
-info. For best display, pass `nodeVersion` and optionally `newsroom` to
-`createLiteHost`:
-
-```js
-import pkg from "./package.json" with { type: "json" };
-
-createServer({
-  slug: "my-node",
-  host: createLiteHost({
-    appSlug: "my-node",
-    nodeVersion: pkg.version,
-    newsroom: "Capital FM",        // optional
-  }),
-  handlers,
-  displayName: "My Node",
-});
-```
+The chrome reads `/api/grounded/meta` (auto-mounted) to populate
+version + newsroom info. That endpoint's contents come from the
+`nodeVersion` and `newsroom` you pass to `createLiteHost` and the
+`nodeVersion` you pass to `createServer` — see the boot block in
+"Wiring a Node" above. The chrome assets are served straight from
+the runtime, so any future visual change (recolour, layout, copy)
+ships to every Node automatically on next `npm install`.
 
 ## Telemetry — the boot beacon, activity log, and error log
 
