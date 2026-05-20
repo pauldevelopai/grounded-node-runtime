@@ -1,0 +1,26 @@
+{
+  "name": "@developai/grounded-node-runtime",
+  "version": "0.1.0",
+  "description": "Shared scaffolding for GROUNDED Nodes: lite host (storage/AI/parse/log shim) + Express server boot. Mirrors the GROUNDED facade interface so the same Node code runs standalone on a newsroom laptop and integrated into the GROUNDED monorepo.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./host-lite": "./src/host-lite.js",
+    "./server": "./src/server.js"
+  },
+  "files": ["src", "README.md"],
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "mammoth": "^1.8.0",
+    "multer": "^1.4.5-lts.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pauldevelopai/grounded-node-runtime.git"
+  }
+}
