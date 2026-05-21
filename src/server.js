@@ -28,6 +28,7 @@ import express from "express";
 import multer from "multer";
 import { mountChrome, readRuntimeVersion } from "./chrome.js";
 import { syncFile, catchupPush } from "./git-sync.js";
+import { telemetryEnabled, sendTelemetry } from "./telemetry.js";
 
 export function createServer({
   slug,
@@ -108,15 +109,33 @@ export function createServer({
   app.post("/api/grounded/feedback", async (req, res) => {
     try {
       const { type, message, page } = req.body || {};
-      const { file } = await host.feedback.submit({ type, message, page });
+      const { file, entry } = await host.feedback.submit({ type, message, page });
       await host.log.run({ op: "feedback_submit", type: type || "other" }).catch(() => {});
-      const sync = await syncFile(file, `feedback: ${type || "other"}`);
-      res.json({
-        saved: true,
-        synced: sync.step === "pushed",
-        sync_step: sync.step,
-        sync_reason: sync.reason || null,
-      });
+
+      if (telemetryEnabled()) {
+        // HTTP path — send to the collector. No git push, no fork needed.
+        const sent = await sendTelemetry("feedback", {
+          host_id: entry.host_id,
+          slug,
+          newsroom: entry.newsroom,
+          ts: entry.ts,
+          type: entry.type,
+          message: entry.message,
+          page: entry.page,
+          node_version: entry.node_version,
+        });
+        // It's saved locally regardless; `synced` reflects whether the POST landed.
+        res.json({ saved: true, synced: sent, sync_step: sent ? "sent" : "send_failed" });
+      } else {
+        // Legacy git path (unchanged) for Nodes not pointed at a collector.
+        const sync = await syncFile(file, `feedback: ${type || "other"}`);
+        res.json({
+          saved: true,
+          synced: sync.step === "pushed",
+          sync_step: sync.step,
+          sync_reason: sync.reason || null,
+        });
+      }
     } catch (e) {
       res.status(400).json({ saved: false, error: e.message || "feedback failed" });
     }

@@ -31,6 +31,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import mammoth from "mammoth";
 import { readRuntimeVersion } from "./chrome.js";
+import { postTelemetry } from "./telemetry.js";
 
 const DEFAULT_DATA_DIR = "data/processed";
 const STANDALONE_NEWSROOM_ID = "local";
@@ -73,6 +74,20 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
     boot_count: (prevMeta?.boot_count || 0) + 1
   };
   writeJson(metaFile, meta);
+
+  // Best-effort: tell the collector this install booted (no-op unless
+  // GROUNDED_TELEMETRY_URL is set). Fire-and-forget — never blocks boot.
+  postTelemetry("install", {
+    host_id: meta.host_id,
+    slug: meta.slug,
+    newsroom: meta.newsroom,
+    node_version: meta.node_version,
+    runtime_version: meta.runtime_version,
+    platform: meta.platform,
+    first_boot: meta.first_boot,
+    last_seen: meta.last_boot,
+    boot_count: meta.boot_count,
+  });
 
   function assertOwned(table) {
     if (!table.startsWith(prefix)) {
@@ -312,29 +327,47 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
   function appendError(entry) {
     const file = tableFile(`${prefix}errors`);
     const log = readJson(file, []);
-    log.push({
+    const row = {
       ts: new Date().toISOString(),
       newsroom_id: ctx.newsroomId,
       host_id: meta.host_id,
       node_version: meta.node_version,
       ...entry
-    });
+    };
+    log.push(row);
     writeJson(file, log);
     console.error(`[error]`, JSON.stringify(entry));
+    postTelemetry("event", {
+      host_id: meta.host_id, slug: meta.slug, ts: row.ts,
+      kind: "error", op: row.op || "", details: detailsJson(row),
+    });
   }
 
   function appendActivity(entry) {
     const file = tableFile(`${prefix}activity`);
     const log = readJson(file, []);
-    log.push({
+    const row = {
       ts: new Date().toISOString(),
       newsroom_id: ctx.newsroomId,
       host_id: meta.host_id,
       node_version: meta.node_version,
       ...entry
-    });
+    };
+    log.push(row);
     writeJson(file, log);
     // Also echo to terminal so the newsroom dev can watch live.
     console.log(`[${entry.kind || "log"}]`, JSON.stringify(entry));
+    postTelemetry("event", {
+      host_id: meta.host_id, slug: meta.slug, ts: row.ts,
+      kind: row.kind || "run", op: row.op || "", details: detailsJson(row),
+    });
+  }
+
+  // Strip the envelope fields and serialise the rest (op-specific counts,
+  // durations, error message/name/context) for the collector's `details` column.
+  function detailsJson(row) {
+    const { ts, newsroom_id, host_id, node_version, kind, op, ...rest } = row;
+    try { const j = JSON.stringify(rest); return j === "{}" ? "" : j; }
+    catch { return ""; }
   }
 }

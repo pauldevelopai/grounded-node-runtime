@@ -1,6 +1,6 @@
 {
   "name": "@developai/grounded-node-runtime",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Shared scaffolding for GROUNDED Nodes: lite host (storage/AI/parse/log shim) + Express server boot + family chrome and telemetry endpoint. Mirrors the GROUNDED facade interface so the same Node code runs standalone on a newsroom laptop and integrated into the GROUNDED monorepo.",
   "license": "Apache-2.0",
   "type": "module",
