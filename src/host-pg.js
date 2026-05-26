@@ -57,6 +57,21 @@ export async function ensureActivitySchema(pool, slug) {
   `);
 }
 
+/** Create the generic per-Node key/value store table. Call once at boot. */
+export async function ensureStoreSchema(pool, slug) {
+  const T = prefixFor(slug);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${T}store (
+      newsroom_id text NOT NULL,
+      collection  text NOT NULL,
+      key         text NOT NULL,
+      value       jsonb,
+      updated_at  timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (newsroom_id, collection, key)
+    );
+  `);
+}
+
 /**
  * Build a per-request host scoped to one newsroom.
  * @param {object} o
@@ -144,10 +159,40 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
     host_id: null
   };
 
+  // Per-newsroom key/value store — same interface as the lite host's, backed by
+  // the ${PREFIX}store table. Values are JSON. Every query is scoped to newsroomId.
+  const store = {
+    list: async (collection) => {
+      const r = await pool.query(
+        `SELECT key, value FROM ${PREFIX}store WHERE newsroom_id=$1 AND collection=$2 ORDER BY key`,
+        [newsroomId, collection]);
+      return r.rows.map((row) => ({ key: row.key, value: row.value }));
+    },
+    get: async (collection, key) => {
+      const r = await pool.query(
+        `SELECT value FROM ${PREFIX}store WHERE newsroom_id=$1 AND collection=$2 AND key=$3`,
+        [newsroomId, collection, String(key)]);
+      return r.rows.length ? r.rows[0].value : null;
+    },
+    put: async (collection, key, value) => {
+      await pool.query(
+        `INSERT INTO ${PREFIX}store (newsroom_id, collection, key, value)
+         VALUES ($1,$2,$3,$4::jsonb)
+         ON CONFLICT (newsroom_id, collection, key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()`,
+        [newsroomId, collection, String(key), JSON.stringify(value ?? null)]);
+    },
+    delete: async (collection, key) => {
+      await pool.query(
+        `DELETE FROM ${PREFIX}store WHERE newsroom_id=$1 AND collection=$2 AND key=$3`,
+        [newsroomId, collection, String(key)]);
+    },
+  };
+
   return {
     ctx,
     tablePrefix: PREFIX,
     meta,
+    store,
     db,
     ai: { chat },
     parse: { docxToHtml: async (buffer) => (await mammoth.convertToHtml({ buffer })).value },

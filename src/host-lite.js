@@ -239,10 +239,37 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
     return { text, provider, model, usedFallback: false };
   }
 
+  // ── Generic per-Node key/value store. Collections of JSON values, keyed by
+  // string. The hosted pg host implements the SAME interface against Postgres,
+  // so a Node's handlers use host.store identically locally and online. Files
+  // live under data/processed/<prefix>store__<collection>.json.
+  const storeFile = (collection) =>
+    tableFile(`${prefix}store__${String(collection).replace(/[^a-z0-9_-]/gi, "_")}`);
+  const store = {
+    list: async (collection) =>
+      Object.entries(readJson(storeFile(collection), {})).map(([key, value]) => ({ key, value })),
+    get: async (collection, key) => {
+      const obj = readJson(storeFile(collection), {});
+      return Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : null;
+    },
+    put: async (collection, key, value) => {
+      const f = storeFile(collection);
+      const obj = readJson(f, {});
+      obj[String(key)] = value;
+      writeJson(f, obj);
+    },
+    delete: async (collection, key) => {
+      const f = storeFile(collection);
+      const obj = readJson(f, {});
+      if (Object.prototype.hasOwnProperty.call(obj, String(key))) { delete obj[String(key)]; writeJson(f, obj); }
+    },
+  };
+
   return {
     ctx,
     tablePrefix: prefix,
     meta,  // sticky install identity — server reads this for /api/grounded/meta
+    store,
 
     db: {
       query,
