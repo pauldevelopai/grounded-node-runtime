@@ -221,12 +221,17 @@ export async function createHostedServer({
     return null;
   }
 
-  // Build the page once; per-user email substituted per request.
+  // The Grounded chrome — the Builder/Tracker nav + the feedback & chat bubbles —
+  // is injected by ONE shared script served from the static front door
+  // (/nodes/chrome.js). That keeps every surface (front door, hosted Nodes, the
+  // tracker) identical and lets the menu change without redeploying any Node:
+  // just edit chrome.js and pull the nodes repo on the box. It's auth-aware on
+  // its own (GET /api/auth/me), so no per-user templating is needed here. We keep
+  // only the Node-specific "run it locally" footer.
   const rawIndex = readFileSync(join(staticDir, "index.html"), "utf8");
   const INDEX_HTML = rawIndex
-    .replace("<body>", `<body>\n${NAV_HTML}`)
-    .replace("</body>", `${footerHtml(slug, repoName)}\n${FEEDBACK_HTML}\n</body>`);
-  const pageFor = (user) => INDEX_HTML.replace(/__GROUNDED_USER__/g, escHtml(user && user.email));
+    .replace("</body>", `${footerHtml(slug, repoName)}\n<script src="/nodes/chrome.js" defer></script>\n</body>`);
+  const pageFor = () => INDEX_HTML;
 
   const app = express();
   app.set("trust proxy", true);

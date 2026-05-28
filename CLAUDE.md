@@ -3,7 +3,16 @@
 Shared scaffolding every GROUNDED Node builds on. Part of **Grounded** (newsroom-owned
 AI by Develop AI). A Node = a small app whose handlers target a **host interface**
 (`host.db / host.store / host.ai / host.parse / host.log / host.feedback / host.meta /
-host.tablePrefix`) so the *same handlers* run two ways. **Current tag: `v0.9.0`.**
+host.tablePrefix`) so the *same handlers* run two ways. **Current tag: `v0.10.0`.**
+
+## Hosted chrome — IMPORTANT (v0.10.0)
+`createHostedServer` no longer inlines the nav/feedback HTML. It injects ONE shared
+script — `<script src="/nodes/chrome.js" defer>` — served from the static front door
+(the `nodes` repo). That script renders the Builder/Tracker nav + the feedback & chat
+bubbles identically on every surface (front door, hosted Nodes, and — matched in style —
+the React tracker). **To change the menu or bubbles, edit `nodes/chrome.js` and
+`git -C /var/www/nodes pull` on the box — no Node or runtime redeploy needed.** Only the
+Node-specific "run it locally" footer is still emitted by the runtime.
 
 ## Exports (`src/index.js`)
 - **`createLiteHost({ appSlug, nodeVersion, newsroom })`** (`host-lite.js`) — local host: JSON files on disk, the user's own AI key. Plus a sticky `host.meta.host_id`.
