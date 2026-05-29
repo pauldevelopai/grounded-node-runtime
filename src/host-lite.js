@@ -32,6 +32,7 @@ import OpenAI from "openai";
 import mammoth from "mammoth";
 import { readRuntimeVersion } from "./chrome.js";
 import { postTelemetry } from "./telemetry.js";
+import { harvestCitations } from "./host-pg.js";
 
 const DEFAULT_DATA_DIR = "data/processed";
 const STANDALONE_NEWSROOM_ID = "local";
@@ -241,10 +242,8 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
       params.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: maxUses }];
     }
     const msg = await client.messages.create(params);
-    const textBlocks = msg.content.filter(b => b.type === "text");
-    const text = textBlocks.map(b => b.text).join("\n").trim();
-    const citations = [];
-    for (const b of textBlocks) if (Array.isArray(b.citations)) for (const c of b.citations) citations.push({ url: c.url, title: c.title });
+    const text = msg.content.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+    const citations = harvestCitations(msg.content);
     return { text, provider, model, usedFallback: false, citations };
   }
 

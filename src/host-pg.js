@@ -21,6 +21,28 @@ import mammoth from "mammoth";
 
 const prefixFor = (slug) => `node_${String(slug).replace(/-/g, "_")}_`;
 
+// Pull {url,title} from a web-search response: the model's inline text citations
+// first (what it actually cited), then the raw web_search_tool_result hits as a
+// fallback so a Node always gets a non-empty source list. Deduped by URL, capped.
+export function harvestCitations(content) {
+  const out = [], seen = new Set();
+  const add = (url, title) => {
+    url = (url || "").trim();
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    out.push({ url, title: title || url });
+  };
+  for (const b of (content || [])) {
+    if (b.type === "text" && Array.isArray(b.citations)) for (const c of b.citations) add(c.url, c.title);
+  }
+  for (const b of (content || [])) {
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+      for (const r of b.content) if (r && r.type === "web_search_result") add(r.url, r.title);
+    }
+  }
+  return out.slice(0, 12);
+}
+
 // Columns the activity log may carry. log.run()/appendActivity fills whichever
 // are present on a given entry.
 const ACTIVITY_COLS = [
@@ -143,8 +165,7 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
     const msg = await client().messages.create(params);
     const textBlocks = (msg.content || []).filter(b => b.type === "text");
     const text = textBlocks.map(b => b.text).join("\n").trim();
-    const citations = [];
-    for (const b of textBlocks) if (Array.isArray(b.citations)) for (const c of b.citations) citations.push({ url: c.url, title: c.title });
+    const citations = harvestCitations(msg.content);
     return { text, provider: "anthropic", model, usedFallback: false, citations };
   }
 
