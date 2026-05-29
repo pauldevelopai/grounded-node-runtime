@@ -228,15 +228,24 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
     }
 
     const client = getAnthropic();
-    const msg = await client.messages.create({
+    // opts.webSearch (true | { maxUses }) enables Claude's server-side web
+    // search tool (Anthropic provider only). OpenAI requests ignore it.
+    const params = {
       model,
       max_tokens: opts.maxTokens || 1000,
       ...(opts.system ? { system: opts.system } : {}),
       messages
-    });
-    const text = msg.content
-      .filter(b => b.type === "text").map(b => b.text).join("\n").trim();
-    return { text, provider, model, usedFallback: false };
+    };
+    if (opts.webSearch) {
+      const maxUses = (typeof opts.webSearch === "object" && opts.webSearch.maxUses) || 5;
+      params.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: maxUses }];
+    }
+    const msg = await client.messages.create(params);
+    const textBlocks = msg.content.filter(b => b.type === "text");
+    const text = textBlocks.map(b => b.text).join("\n").trim();
+    const citations = [];
+    for (const b of textBlocks) if (Array.isArray(b.citations)) for (const c of b.citations) citations.push({ url: c.url, title: c.title });
+    return { text, provider, model, usedFallback: false, citations };
   }
 
   // ── Generic per-Node key/value store. Collections of JSON values, keyed by

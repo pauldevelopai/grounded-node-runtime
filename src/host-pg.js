@@ -124,16 +124,28 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
     return anthropic;
   };
   async function chat(input, opts = {}) {
+    // opts.webSearch (true | { maxUses }) turns on Claude's server-side web
+    // search tool — Anthropic runs the searches and returns the final answer
+    // with citations in a single call. Lets a Node fact-check against the live
+    // web instead of training knowledge alone.
     const model = opts.model || process.env.MODEL || "claude-haiku-4-5";
     const messages = typeof input === "string" ? [{ role: "user", content: input }] : input;
-    const msg = await client().messages.create({
+    const params = {
       model,
       max_tokens: opts.maxTokens || 1000,
       ...(opts.system ? { system: opts.system } : {}),
       messages
-    });
-    const text = msg.content.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
-    return { text, provider: "anthropic", model, usedFallback: false };
+    };
+    if (opts.webSearch) {
+      const maxUses = (typeof opts.webSearch === "object" && opts.webSearch.maxUses) || 5;
+      params.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: maxUses }];
+    }
+    const msg = await client().messages.create(params);
+    const textBlocks = (msg.content || []).filter(b => b.type === "text");
+    const text = textBlocks.map(b => b.text).join("\n").trim();
+    const citations = [];
+    for (const b of textBlocks) if (Array.isArray(b.citations)) for (const c of b.citations) citations.push({ url: c.url, title: c.title });
+    return { text, provider: "anthropic", model, usedFallback: false, citations };
   }
 
   async function appendActivity(entry) {
