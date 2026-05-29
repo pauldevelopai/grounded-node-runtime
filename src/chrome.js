@@ -350,7 +350,7 @@ const CHROME_JS = `
         '</div>';
       wrap.innerHTML =
         '<div class="gc-topbar">' +
-          '<a class="gc-mark" href="https://github.com/pauldevelopai/groundedai" target="_blank" rel="noopener">' +
+          '<a class="gc-mark" href="https://grounded.developai.co.za" target="_blank" rel="noopener">' +
             'GROUNDED' +
           '</a>' +
           contextRight +
