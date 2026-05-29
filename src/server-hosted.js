@@ -36,54 +36,18 @@ const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
 
 const BASE = "https://grounded.developai.co.za";
 
-// The shared GROUNDED nav (umbrella brand). __GROUNDED_USER__ is filled per request.
-const NAV_HTML = `<style id="g-nav-style">
-#g-nav{border-bottom:1px solid #E2E8F0;background:#fff;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
-#g-nav .g-bar{max-width:1180px;margin:0 auto;padding:12px 26px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
-#g-nav .g-brand{text-decoration:none;color:#1A202C;display:flex;flex-direction:column;line-height:1.2}
-#g-nav .g-brand b{font-size:18px;font-weight:700;letter-spacing:-0.01em}
-#g-nav .g-brand span{font-size:11px;color:#718096;font-weight:500}
-#g-nav .g-links{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-#g-nav .g-links a{padding:8px 12px;border-radius:6px;font-size:14px;font-weight:500;color:#718096;text-decoration:none}
-#g-nav .g-links a:hover{color:#1A202C}
-#g-nav .g-links a.active{font-weight:600;color:#1A202C;background:#EEF2FF}
-#g-nav .g-user{display:flex;align-items:center;gap:10px;padding-left:10px;margin-left:4px;border-left:1px solid #E2E8F0}
-#g-nav .g-email{font-size:13px;color:#1A202C;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#g-nav .g-logout{margin:0}
-#g-nav .g-logout button{font:inherit;font-size:13px;font-weight:500;color:#718096;background:none;border:1px solid #E2E8F0;border-radius:6px;padding:7px 12px;cursor:pointer}
-#g-nav .g-logout button:hover{color:#1A202C;border-color:#CBD5E1}
-</style>
-<nav id="g-nav"><div class="g-bar">
-  <a class="g-brand" href="/"><b>Grounded</b><span>Newsroom-owned AI &middot; by Develop&nbsp;AI</span></a>
-  <div class="g-links">
-    <a href="/">Home</a>
-    <a href="/legal/lawsuits">Lawsuits</a>
-    <a href="/legal/regulations">Regulations</a>
-    <a href="/legal/explore">Connections</a>
-    <a href="/legal/use-cases">Use cases</a>
-    <a href="/tools/">Tools</a>
-    <a href="/legal/sources">Sources</a>
-    <a href="/legal/submit">Submit</a>
-    <a href="/nodes/" class="active">Nodes</a>
-    <span class="g-user">
-      <span class="g-email" title="__GROUNDED_USER__">__GROUNDED_USER__</span>
-      <form class="g-logout" method="POST" action="/api/auth/logout"><button type="submit">Sign out</button></form>
-    </span>
-  </div>
-</div></nav>`;
-
 const footerHtml = (slug, repo) => `<style>
-#g-local{background:#0d0c0a;border-top:2px solid #c4761b;color:#ede4d3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:34px 26px 44px}
+#g-local{background:#F8FAFC;border-top:1px solid #E2E8F0;color:#1A202C;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:34px 26px 44px}
 #g-local .gl-wrap{max-width:1180px;margin:0 auto}
 #g-local h3{font-size:19px;font-weight:600;margin:0 0 6px}
-#g-local p{color:#a89e88;font-size:14px;margin:0 0 18px;max-width:70ch}
+#g-local p{color:#64748B;font-size:14px;margin:0 0 18px;max-width:70ch}
 #g-local .gl-row{display:grid;grid-template-columns:78px 1fr auto;gap:10px;align-items:center;margin-bottom:8px}
-#g-local .gl-os{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#a89e88}
-#g-local code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;background:#1c1a14;color:#e8a13a;border:1px solid #3a352a;border-radius:5px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
-#g-local .gl-copy{font-family:inherit;font-size:12px;background:#1c1a14;color:#ede4d3;border:1px solid #3a352a;border-radius:5px;padding:9px 13px;cursor:pointer}
-#g-local .gl-copy:hover{border-color:#c4761b;color:#e8a13a}
-#g-local .gl-note{margin-top:16px;font-size:13px;color:#a89e88}
-#g-local .gl-note a{color:#e8a13a;text-decoration:none}
+#g-local .gl-os{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#64748B}
+#g-local code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;background:#F1F5F9;color:#1A202C;border:1px solid #E2E8F0;border-radius:5px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
+#g-local .gl-copy{font-family:inherit;font-size:12px;background:#fff;color:#64748B;border:1px solid #E2E8F0;border-radius:5px;padding:9px 13px;cursor:pointer}
+#g-local .gl-copy:hover{border-color:#3B82F6;color:#3B82F6}
+#g-local .gl-note{margin-top:16px;font-size:13px;color:#64748B}
+#g-local .gl-note a{color:#3B82F6;text-decoration:none}
 #g-local .gl-note a:hover{text-decoration:underline}
 @media(max-width:640px){#g-local .gl-row{grid-template-columns:1fr;gap:5px}}
 </style>
@@ -103,62 +67,6 @@ document.querySelectorAll('#g-local .gl-copy').forEach(function(b){
   });
 });
 </script></footer>`;
-
-// Feedback widget → posts to the tracker's /api/feedback (same origin, cookie rides along).
-const FEEDBACK_HTML = `<style>
-#g-fb-btn{position:fixed;right:18px;bottom:18px;z-index:99990;background:#c4761b;color:#fff;border:none;border-radius:999px;padding:11px 18px;font:600 13px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
-#g-fb-btn:hover{background:#a8543a}
-#g-fb-panel{position:fixed;right:18px;bottom:66px;z-index:99991;width:320px;max-width:calc(100vw - 36px);background:#1c1a14;border:1px solid #3a352a;border-radius:10px;padding:16px;display:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#ede4d3;box-shadow:0 10px 30px rgba(0,0,0,.45)}
-#g-fb-panel.open{display:block}
-#g-fb-panel h4{margin:0 0 8px;font-size:14px;font-weight:600}
-#g-fb-types{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
-#g-fb-types button{background:#0d0c0a;border:1px solid #3a352a;color:#a89e88;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer}
-#g-fb-types button.on{background:#c4761b;color:#fff;border-color:#c4761b}
-#g-fb-panel textarea{width:100%;min-height:78px;background:#0d0c0a;color:#ede4d3;border:1px solid #3a352a;border-radius:6px;padding:9px;font:inherit;font-size:13px;resize:vertical}
-#g-fb-rowx{display:flex;gap:6px;margin-top:8px}
-#g-fb-rowx select{flex:1;background:#0d0c0a;color:#ede4d3;border:1px solid #3a352a;border-radius:5px;padding:7px;font-size:12px}
-#g-fb-send{background:#c4761b;color:#fff;border:none;border-radius:5px;padding:7px 16px;font:600 13px inherit;cursor:pointer}
-#g-fb-send:disabled{opacity:.6;cursor:wait}
-#g-fb-result{font-size:12px;margin-top:8px}
-</style>
-<button id="g-fb-btn" type="button">Feedback</button>
-<div id="g-fb-panel">
-  <h4>Send feedback to Develop AI</h4>
-  <div id="g-fb-types">
-    <button data-c="bug" type="button">Bug</button>
-    <button data-c="feature" class="on" type="button">Feature</button>
-    <button data-c="improvement" type="button">Improvement</button>
-    <button data-c="ui" type="button">UI</button>
-  </div>
-  <textarea id="g-fb-text" placeholder="A bug, an idea, a question — anything."></textarea>
-  <div id="g-fb-rowx">
-    <select id="g-fb-pri"><option value="low">Low priority</option><option value="medium" selected>Medium priority</option><option value="high">High priority</option></select>
-    <button id="g-fb-send" type="button">Send</button>
-  </div>
-  <div id="g-fb-result"></div>
-</div>
-<script>
-(function(){
-  var btn=document.getElementById('g-fb-btn'),panel=document.getElementById('g-fb-panel'),
-      text=document.getElementById('g-fb-text'),send=document.getElementById('g-fb-send'),
-      pri=document.getElementById('g-fb-pri'),result=document.getElementById('g-fb-result'),cat='feature';
-  btn.addEventListener('click',function(){panel.classList.toggle('open');if(panel.classList.contains('open'))text.focus();});
-  document.querySelectorAll('#g-fb-types button').forEach(function(b){
-    b.addEventListener('click',function(){cat=b.getAttribute('data-c');document.querySelectorAll('#g-fb-types button').forEach(function(x){x.classList.toggle('on',x===b);});});
-  });
-  send.addEventListener('click',function(){
-    var content=text.value.trim();
-    if(!content){result.style.color='#d9543f';result.textContent='Write a message first.';return;}
-    send.disabled=true;result.style.color='#a89e88';result.textContent='Sending...';
-    fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
-      body:JSON.stringify({content:content,category:cat,priority:pri.value,page:location.pathname})})
-      .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-      .then(function(){result.style.color='#7fae6a';result.textContent='Sent — thanks!';text.value='';setTimeout(function(){panel.classList.remove('open');result.textContent='';},1600);})
-      .catch(function(e){result.style.color='#d9543f';result.textContent='Could not send ('+e.message+').';})
-      .finally(function(){send.disabled=false;});
-  });
-})();
-</script>`;
 
 export async function createHostedServer({
   slug,

@@ -26,21 +26,24 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CHROME_CSS = `
 /* GROUNDED chrome — applied by every Node that opts in.
    Family branding visible at top and bottom. Single CSS var block at
-   the top of this rule set so swapping colours is one-line work. */
+   the top of this rule set so swapping colours is one-line work.
+   Light Grounded palette — matches the tracker + the /nodes/chrome.js nav. */
 
 #grounded-chrome {
-  --gc-rust: #a8543a;
-  --gc-rust-deep: #7d3d2a;
-  --gc-rust-light: #d18866;
-  --gc-cream: #fdf4ea;
-  --gc-ink: #1a1715;
-  --gc-paper-dim: #c4b8a8;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --gc-blue: #3B82F6;
+  --gc-blue-deep: #2563EB;
+  --gc-blue-light: #93C5FD;
+  --gc-bg: #ffffff;
+  --gc-bg-soft: #F8FAFC;
+  --gc-ink: #1A202C;
+  --gc-dim: #64748B;
+  --gc-border: #E2E8F0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Top bar — full-width terracotta banner. Sets parent-platform context
-   the moment the page loads. */
+/* Top bar — slim white banner with a bottom border, matching the nav.
+   Sets parent-platform context the moment the page loads. */
 #grounded-chrome .gc-topbar {
   position: fixed;
   top: 0;
@@ -48,24 +51,24 @@ const CHROME_CSS = `
   right: 0;
   height: 34px;
   z-index: 99998;
-  background: var(--gc-rust);
-  background: linear-gradient(180deg, var(--gc-rust) 0%, var(--gc-rust-deep) 100%);
-  color: var(--gc-cream);
+  background: var(--gc-bg);
+  color: var(--gc-ink);
+  border-bottom: 1px solid var(--gc-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
   font-size: 12px;
   letter-spacing: 0.5px;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 #grounded-chrome .gc-topbar .gc-mark {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  color: var(--gc-cream);
+  color: var(--gc-ink);
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 1.6px;
   font-size: 12px;
 }
@@ -73,20 +76,20 @@ const CHROME_CSS = `
   content: "";
   width: 9px;
   height: 9px;
-  background: var(--gc-rust-light);
+  background: var(--gc-blue);
   border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.18);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.18);
   display: inline-block;
 }
-#grounded-chrome .gc-topbar .gc-mark:hover { color: #ffffff; }
+#grounded-chrome .gc-topbar .gc-mark:hover { color: var(--gc-blue-deep); }
 #grounded-chrome .gc-topbar .gc-context {
   font-size: 11px;
-  color: rgba(253, 244, 234, 0.78);
+  color: var(--gc-dim);
   letter-spacing: 0.3px;
 }
 #grounded-chrome .gc-topbar .gc-context .gc-newsroom {
   font-weight: 600;
-  color: var(--gc-cream);
+  color: var(--gc-ink);
   letter-spacing: 0.4px;
 }
 #grounded-chrome .gc-topbar .gc-context .gc-sep {
@@ -94,16 +97,15 @@ const CHROME_CSS = `
   opacity: 0.5;
 }
 
-/* Footer — keeps the dark coffee background but with a rust accent
-   for the dot, so top and bottom feel related. */
+/* Footer — light, with a blue accent dot so top and bottom feel related. */
 #grounded-chrome .gc-footer {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 99998;
-  background: rgba(26, 23, 21, 0.96);
-  color: var(--gc-paper-dim);
+  background: rgba(248, 250, 252, 0.96);
+  color: var(--gc-dim);
   font-size: 11px;
   letter-spacing: 0.25px;
   padding: 6px 18px;
@@ -111,19 +113,19 @@ const CHROME_CSS = `
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  border-top: 2px solid var(--gc-rust);
+  border-top: 1px solid var(--gc-border);
 }
 #grounded-chrome .gc-footer .gc-foot-left {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--gc-cream);
+  color: var(--gc-ink);
 }
 #grounded-chrome .gc-footer .gc-foot-left::before {
   content: "";
   width: 6px;
   height: 6px;
-  background: var(--gc-rust-light);
+  background: var(--gc-blue);
   border-radius: 50%;
   display: inline-block;
 }
@@ -146,8 +148,8 @@ const CHROME_CSS = `
   right: 18px;
   bottom: 44px;
   z-index: 99997;
-  background: var(--gc-rust);
-  color: var(--gc-cream);
+  background: var(--gc-blue);
+  color: #ffffff;
   border: none;
   border-radius: 999px;
   padding: 10px 18px 10px 14px;
@@ -156,32 +158,32 @@ const CHROME_CSS = `
   font-weight: 500;
   letter-spacing: 0.3px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(122, 53, 32, 0.32);
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.30);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
 #grounded-chrome .gc-feedback-btn:hover {
-  background: var(--gc-rust-deep);
+  background: var(--gc-blue-deep);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(122, 53, 32, 0.42);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.40);
 }
 #grounded-chrome .gc-feedback-btn::before {
   content: "";
   width: 8px;
   height: 8px;
-  background: var(--gc-rust-light);
+  background: var(--gc-blue-light);
   border-radius: 50%;
   display: inline-block;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
 }
 
 /* Modal */
 #grounded-chrome .gc-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(20, 16, 14, 0.55);
+  background: rgba(15, 23, 42, 0.45);
   z-index: 99999;
   display: none;
   align-items: center;
@@ -190,16 +192,17 @@ const CHROME_CSS = `
 }
 #grounded-chrome .gc-modal-backdrop.gc-open { display: flex; }
 #grounded-chrome .gc-modal {
-  background: var(--gc-cream);
+  background: var(--gc-bg);
   color: var(--gc-ink);
+  border: 1px solid var(--gc-border);
   border-radius: 10px;
   max-width: 520px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
   padding: 1.5rem 1.75rem 1.25rem;
-  box-shadow: 0 18px 50px rgba(0,0,0,0.35);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.18);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 #grounded-chrome .gc-modal h2 {
   margin: 0 0 0.35rem;
@@ -208,18 +211,18 @@ const CHROME_CSS = `
   letter-spacing: 0.2px;
 }
 #grounded-chrome .gc-modal .gc-modal-sub {
-  color: #6b5d52;
+  color: var(--gc-dim);
   font-size: 0.85rem;
   margin-bottom: 1rem;
   line-height: 1.5;
 }
 #grounded-chrome .gc-modal .gc-privacy {
   font-size: 0.78rem;
-  background: #f3e6d6;
-  border-left: 3px solid var(--gc-rust);
+  background: #EFF6FF;
+  border-left: 3px solid var(--gc-blue);
   padding: 0.55rem 0.75rem;
   margin: 0 0 1rem;
-  color: #5a3a2a;
+  color: #1E40AF;
   line-height: 1.5;
   border-radius: 0 4px 4px 0;
 }
@@ -228,7 +231,7 @@ const CHROME_CSS = `
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #6b5d52;
+  color: var(--gc-dim);
   font-weight: 500;
   margin: 0.85rem 0 0.4rem;
 }
@@ -239,19 +242,19 @@ const CHROME_CSS = `
 }
 #grounded-chrome .gc-modal .gc-types button {
   background: #ffffff;
-  border: 1px solid #d8c6b0;
+  border: 1px solid var(--gc-border);
   border-radius: 6px;
   padding: 0.45rem 0.85rem;
   font-family: inherit;
   font-size: 0.82rem;
   cursor: pointer;
-  color: #4a3829;
+  color: var(--gc-ink);
   transition: all 0.12s ease;
 }
 #grounded-chrome .gc-modal .gc-types button.gc-picked {
-  background: var(--gc-rust);
-  color: var(--gc-cream);
-  border-color: var(--gc-rust-deep);
+  background: var(--gc-blue);
+  color: #ffffff;
+  border-color: var(--gc-blue-deep);
 }
 #grounded-chrome .gc-modal textarea {
   width: 100%;
@@ -259,7 +262,7 @@ const CHROME_CSS = `
   padding: 0.7rem 0.85rem;
   font-family: inherit;
   font-size: 0.92rem;
-  border: 1px solid #d8c6b0;
+  border: 1px solid var(--gc-border);
   border-radius: 6px;
   background: #ffffff;
   color: var(--gc-ink);
@@ -268,8 +271,8 @@ const CHROME_CSS = `
 }
 #grounded-chrome .gc-modal textarea:focus {
   outline: none;
-  border-color: var(--gc-rust);
-  box-shadow: 0 0 0 3px rgba(168, 84, 58, 0.15);
+  border-color: var(--gc-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 #grounded-chrome .gc-modal .gc-actions {
   display: flex;
@@ -279,8 +282,8 @@ const CHROME_CSS = `
 }
 #grounded-chrome .gc-modal button.gc-cancel {
   background: none;
-  border: 1px solid #d8c6b0;
-  color: #6b5d52;
+  border: 1px solid var(--gc-border);
+  color: var(--gc-dim);
   padding: 0.55rem 1rem;
   border-radius: 6px;
   cursor: pointer;
@@ -288,9 +291,9 @@ const CHROME_CSS = `
   font-size: 0.88rem;
 }
 #grounded-chrome .gc-modal button.gc-submit {
-  background: var(--gc-rust);
+  background: var(--gc-blue);
   border: none;
-  color: var(--gc-cream);
+  color: #ffffff;
   padding: 0.55rem 1.3rem;
   border-radius: 6px;
   cursor: pointer;
@@ -298,9 +301,9 @@ const CHROME_CSS = `
   font-size: 0.88rem;
   font-weight: 500;
 }
-#grounded-chrome .gc-modal button.gc-submit:hover { background: var(--gc-rust-deep); }
+#grounded-chrome .gc-modal button.gc-submit:hover { background: var(--gc-blue-deep); }
 #grounded-chrome .gc-modal button.gc-submit:disabled {
-  background: #c4a896;
+  background: #93C5FD;
   cursor: wait;
 }
 #grounded-chrome .gc-modal .gc-result {
@@ -312,18 +315,18 @@ const CHROME_CSS = `
   display: none;
 }
 #grounded-chrome .gc-modal .gc-result.gc-good {
-  background: #e8f0e3;
-  color: #355e2c;
+  background: #D1FAE5;
+  color: #065F46;
   display: block;
 }
 #grounded-chrome .gc-modal .gc-result.gc-partial {
-  background: #fdf0d6;
-  color: #7a5b1e;
+  background: #FEF3C7;
+  color: #92400E;
   display: block;
 }
 #grounded-chrome .gc-modal .gc-result.gc-bad {
-  background: #f7e1de;
-  color: #8a3a2c;
+  background: #FEE2E2;
+  color: #991B1B;
   display: block;
 }
 `;
