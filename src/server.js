@@ -60,7 +60,9 @@ export function createServer({
   });
 
   const wrap = fn => async (req, res) => {
-    try { res.json(await fn(host, req.body || req.query || {})); }
+    // Merge query + body so GET handlers see ?params (Express sets req.body to {}
+    // for GET, which would otherwise shadow req.query). Body wins on conflict.
+    try { res.json(await fn(host, { ...(req.query || {}), ...(req.body || {}) })); }
     catch (e) {
       res.status(500).json({ error: e.message || "node error" });
       // Fire-and-forget: log the error to the structured error feed so

@@ -1,6 +1,6 @@
 {
   "name": "@developai/grounded-node-runtime",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "Shared scaffolding for GROUNDED Nodes: lite host (storage/AI/parse/log shim) + Express server boot + family chrome and telemetry endpoint. Mirrors the GROUNDED facade interface so the same Node code runs standalone on a newsroom laptop and integrated into the GROUNDED monorepo.",
   "license": "Apache-2.0",
   "type": "module",
@@ -13,8 +13,13 @@
     "./host-pg": "./src/host-pg.js",
     "./chrome": "./src/chrome.js"
   },
-  "files": ["src", "README.md"],
-  "engines": { "node": ">=20" },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "openai": "^4.73.0",
