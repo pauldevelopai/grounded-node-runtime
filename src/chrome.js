@@ -30,9 +30,12 @@ const CHROME_CSS = `
    Light Grounded palette — matches the tracker + the /nodes/chrome.js nav. */
 
 #grounded-chrome {
-  --gc-blue: #3B82F6;
-  --gc-blue-deep: #2563EB;
-  --gc-blue-light: #93C5FD;
+  /* Terracotta — the single Grounded accent, identical across the tracker,
+     the nodes front door and every Node bubble. (Var names kept for diff
+     stability; the values are now terracotta.) */
+  --gc-blue: #c4761b;
+  --gc-blue-deep: #a8543a;
+  --gc-blue-light: #e0a368;
   --gc-bg: #ffffff;
   --gc-bg-soft: #F8FAFC;
   --gc-ink: #1A202C;
@@ -78,7 +81,7 @@ const CHROME_CSS = `
   height: 9px;
   background: var(--gc-blue);
   border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.18);
+  box-shadow: 0 0 0 2px rgba(196,118,27,0.18);
   display: inline-block;
 }
 #grounded-chrome .gc-topbar .gc-mark:hover { color: var(--gc-blue-deep); }
@@ -142,42 +145,93 @@ const CHROME_CSS = `
   #grounded-chrome .gc-footer .gc-meta .gc-newsroom { display: none; }
 }
 
-/* Feedback floating button — sits above the footer, right side. */
-#grounded-chrome .gc-feedback-btn {
+/* Floating bubbles — Ask For Help (chat) + Feedback, stacked above the footer.
+   Round terracotta icon buttons, identical to the tracker + front-door bubbles.
+   Feedback is the corner button; the chat bubble stacks above it. */
+#grounded-chrome .gc-bubbles {
   position: fixed;
-  right: 18px;
+  right: 20px;
   bottom: 44px;
   z-index: 99997;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#grounded-chrome .gc-bub {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
   background: var(--gc-blue);
   color: #ffffff;
   border: none;
-  border-radius: 999px;
-  padding: 10px 18px 10px 14px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.3px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.30);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  justify-content: center;
+  transition: transform 0.12s ease, background 0.12s ease;
 }
-#grounded-chrome .gc-feedback-btn:hover {
-  background: var(--gc-blue-deep);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.40);
+#grounded-chrome .gc-bub:hover { background: var(--gc-blue-deep); transform: translateY(-1px); }
+#grounded-chrome .gc-bub svg { width: 22px; height: 22px; }
+
+/* Ask For Help chat panel */
+#grounded-chrome .gc-chat {
+  position: fixed;
+  right: 20px;
+  bottom: 44px;
+  z-index: 99999;
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  height: 560px;
+  max-height: calc(100vh - 90px);
+  background: #ffffff;
+  border: 1px solid var(--gc-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
 }
-#grounded-chrome .gc-feedback-btn::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  background: var(--gc-blue-light);
-  border-radius: 50%;
-  display: inline-block;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
+#grounded-chrome .gc-chat.gc-open { display: flex; }
+#grounded-chrome .gc-chat-head {
+  padding: 12px 14px;
+  background: #0B1220;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+#grounded-chrome .gc-chat-head .gc-chat-title { font-size: 14px; font-weight: 700; display: block; }
+#grounded-chrome .gc-chat-head .gc-chat-sub { font-size: 10px; color: #94A3B8; display: block; }
+#grounded-chrome .gc-chat-head .gc-chat-x {
+  background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 14px; padding: 4px 8px;
+}
+#grounded-chrome .gc-chat-log { flex: 1; overflow-y: auto; padding: 12px; background: #FAFAF9; }
+#grounded-chrome .gc-chat-intro { font-size: 13px; color: var(--gc-ink); margin-bottom: 12px; line-height: 1.5; }
+#grounded-chrome .gc-suggest {
+  display: block; width: 100%; text-align: left; margin-bottom: 4px;
+  padding: 8px 10px; font-size: 12px; border: 1px solid var(--gc-border);
+  border-radius: 8px; background: #ffffff; color: var(--gc-ink); cursor: pointer;
+}
+#grounded-chrome .gc-msg { margin: 6px 0; display: flex; }
+#grounded-chrome .gc-msg.gc-me { justify-content: flex-end; }
+#grounded-chrome .gc-msg .gc-txt {
+  max-width: 85%; padding: 9px 12px; border-radius: 12px;
+  font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+}
+#grounded-chrome .gc-msg.gc-me .gc-txt { background: var(--gc-blue); color: #ffffff; }
+#grounded-chrome .gc-msg.gc-them .gc-txt { background: #ffffff; color: var(--gc-ink); border: 1px solid var(--gc-border); }
+#grounded-chrome .gc-chat-form { padding: 10px; border-top: 1px solid var(--gc-border); display: flex; gap: 6px; }
+#grounded-chrome .gc-chat-form input {
+  flex: 1; padding: 8px 12px; font-size: 13px;
+  border: 1px solid var(--gc-border); border-radius: 6px; background: #ffffff; color: var(--gc-ink);
+}
+#grounded-chrome .gc-chat-form button {
+  padding: 0 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+  border: none; border-radius: 6px; background: var(--gc-blue); color: #ffffff;
+}
+#grounded-chrome .gc-chat-form button:disabled { opacity: 0.5; cursor: default; }
 
 /* Modal */
 #grounded-chrome .gc-modal-backdrop {
@@ -218,11 +272,11 @@ const CHROME_CSS = `
 }
 #grounded-chrome .gc-modal .gc-privacy {
   font-size: 0.78rem;
-  background: #EFF6FF;
+  background: #FDF3E7;
   border-left: 3px solid var(--gc-blue);
   padding: 0.55rem 0.75rem;
   margin: 0 0 1rem;
-  color: #1E40AF;
+  color: #8a4b12;
   line-height: 1.5;
   border-radius: 0 4px 4px 0;
 }
@@ -272,7 +326,7 @@ const CHROME_CSS = `
 #grounded-chrome .gc-modal textarea:focus {
   outline: none;
   border-color: var(--gc-blue);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(196, 118, 27, 0.15);
 }
 #grounded-chrome .gc-modal .gc-actions {
   display: flex;
@@ -303,7 +357,7 @@ const CHROME_CSS = `
 }
 #grounded-chrome .gc-modal button.gc-submit:hover { background: var(--gc-blue-deep); }
 #grounded-chrome .gc-modal button.gc-submit:disabled {
-  background: #93C5FD;
+  background: var(--gc-blue-light);
   cursor: wait;
 }
 #grounded-chrome .gc-modal .gc-result {
@@ -338,6 +392,20 @@ const CHROME_JS = `
    by a Node's own body styles. */
 (function () {
   if (document.getElementById("grounded-chrome")) return;
+
+  // The Ask For Help chat reaches the central Grounded server (the same
+  // /public/chat the tracker + front door use), so a locally-run Node gives
+  // the same answers as the hosted surfaces. Needs the user to be online.
+  var CHAT_URL = 'https://grounded.developai.co.za/public/chat';
+  var CHAT_STORE = 'grounded_help_v1';
+  var ICON_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
+  var ICON_FB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  var CHAT_SUGGEST = [
+    'What cases has OpenAI been sued in?',
+    'When does the EU AI Act take effect?',
+    'What is the Colorado AI Act?',
+  ];
+
   fetch("/api/grounded/meta")
     .then(function (r) { return r.json(); })
     .then(function (m) {
@@ -358,9 +426,21 @@ const CHROME_JS = `
           '</a>' +
           contextRight +
         '</div>' +
-        '<button class="gc-feedback-btn" type="button" aria-label="Send feedback to Develop AI">' +
-          'Feedback' +
-        '</button>' +
+        '<div class="gc-bubbles">' +
+          '<button class="gc-bub gc-chat-open" type="button" aria-label="Ask For Help" title="Ask For Help">' + ICON_CHAT + '</button>' +
+          '<button class="gc-bub gc-fb-open" type="button" aria-label="Send feedback" title="Send feedback to Develop AI">' + ICON_FB + '</button>' +
+        '</div>' +
+        '<div class="gc-chat" role="dialog" aria-label="Ask For Help">' +
+          '<div class="gc-chat-head">' +
+            '<div><span class="gc-chat-title">Ask For Help</span><span class="gc-chat-sub">Powered by Claude</span></div>' +
+            '<button class="gc-chat-x" type="button" aria-label="Close">\\u2715</button>' +
+          '</div>' +
+          '<div class="gc-chat-log"></div>' +
+          '<form class="gc-chat-form">' +
+            '<input type="text" placeholder="Ask a question\\u2026" maxlength="500" autocomplete="off" />' +
+            '<button type="submit">Send</button>' +
+          '</form>' +
+        '</div>' +
         '<div class="gc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="gc-modal-title">' +
           '<div class="gc-modal">' +
             '<h2 id="gc-modal-title">Send feedback to Develop AI</h2>' +
@@ -401,7 +481,7 @@ const CHROME_JS = `
       // ── Feedback widget wiring ─────────────────────────────────
       var backdrop = wrap.querySelector('.gc-modal-backdrop');
       var modal = wrap.querySelector('.gc-modal');
-      var openBtn = wrap.querySelector('.gc-feedback-btn');
+      var openBtn = wrap.querySelector('.gc-fb-open');
       var cancelBtn = wrap.querySelector('.gc-cancel');
       var submitBtn = wrap.querySelector('.gc-submit');
       var textarea = wrap.querySelector('textarea');
@@ -410,6 +490,7 @@ const CHROME_JS = `
       var pickedType = null;
 
       function openModal() {
+        chatClose();
         backdrop.classList.add('gc-open');
         resultBox.className = 'gc-result';
         resultBox.textContent = '';
@@ -490,6 +571,120 @@ const CHROME_JS = `
             submitBtn.disabled = false;
             submitBtn.textContent = 'Send feedback';
           });
+      });
+
+      // ── Ask For Help chat wiring ───────────────────────────────
+      var chatPanel = wrap.querySelector('.gc-chat');
+      var chatOpenBtn = wrap.querySelector('.gc-chat-open');
+      var chatX = wrap.querySelector('.gc-chat-x');
+      var chatLog = wrap.querySelector('.gc-chat-log');
+      var chatForm = wrap.querySelector('.gc-chat-form');
+      var chatInput = chatForm.querySelector('input');
+      var chatSend = chatForm.querySelector('button');
+      var chatBusy = false;
+      var chatHistory = [];
+      try { chatHistory = JSON.parse(sessionStorage.getItem(CHAT_STORE) || '[]') || []; } catch (e) {}
+
+      function chatStrip(t) {
+        return String(t == null ? '' : t)
+          .replace(/\\[(lawsuit|regulation):[0-9a-f-]{8,}\\]/gi, '')
+          .replace(/\\s+([.,;:])/g, '$1')
+          .trim();
+      }
+      function chatSave() {
+        try { sessionStorage.setItem(CHAT_STORE, JSON.stringify(chatHistory)); } catch (e) {}
+      }
+      function chatRender() {
+        chatLog.innerHTML = '';
+        if (!chatHistory.length) {
+          var intro = document.createElement('div');
+          intro.className = 'gc-chat-intro';
+          intro.textContent = 'Ask about the AI lawsuits and regulations Grounded tracks. I summarise public records — I am not a lawyer.';
+          chatLog.appendChild(intro);
+          CHAT_SUGGEST.forEach(function (s) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'gc-suggest';
+            b.textContent = s;
+            b.addEventListener('click', function () { chatSendMsg(s); });
+            chatLog.appendChild(b);
+          });
+        } else {
+          chatHistory.forEach(function (msg) {
+            var row = document.createElement('div');
+            row.className = 'gc-msg ' + (msg.role === 'user' ? 'gc-me' : 'gc-them');
+            var t = document.createElement('div');
+            t.className = 'gc-txt';
+            t.textContent = msg.content;
+            row.appendChild(t);
+            chatLog.appendChild(row);
+          });
+        }
+        if (chatBusy) {
+          var br = document.createElement('div');
+          br.className = 'gc-msg gc-them';
+          var bt = document.createElement('div');
+          bt.className = 'gc-txt';
+          bt.textContent = 'Thinking…';
+          br.appendChild(bt);
+          chatLog.appendChild(br);
+        }
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      function chatOpen() {
+        closeModal();
+        chatPanel.classList.add('gc-open');
+        chatRender();
+        setTimeout(function () { chatInput.focus(); }, 50);
+      }
+      function chatClose() { chatPanel.classList.remove('gc-open'); }
+      function chatSendMsg(text) {
+        var msg = (text || '').trim();
+        if (!msg || chatBusy) return;
+        chatHistory.push({ role: 'user', content: msg });
+        chatSave();
+        chatBusy = true;
+        chatInput.value = '';
+        chatSend.disabled = true;
+        chatRender();
+        var prior = chatHistory.slice(0, -1).map(function (h) { return { role: h.role, content: h.content }; });
+        fetch(CHAT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg, history: prior }),
+        })
+          .then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+          })
+          .then(function (res) {
+            chatBusy = false;
+            chatSend.disabled = false;
+            var reply = res.j && (res.j.reply || res.j.message || res.j.answer);
+            if (!res.ok || !reply) {
+              reply = (res.j && res.j.error) || 'Sorry — I could not answer just now. Please try again.';
+            }
+            chatHistory.push({ role: 'assistant', content: chatStrip(reply) });
+            chatSave();
+            chatRender();
+          })
+          .catch(function () {
+            chatBusy = false;
+            chatSend.disabled = false;
+            chatHistory.push({ role: 'assistant', content: 'Could not reach the help service. Check your connection and try again.' });
+            chatSave();
+            chatRender();
+          });
+      }
+      chatOpenBtn.addEventListener('click', function () {
+        if (chatPanel.classList.contains('gc-open')) { chatClose(); } else { chatOpen(); }
+      });
+      chatX.addEventListener('click', chatClose);
+      chatForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        chatSendMsg(chatInput.value);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && chatPanel.classList.contains('gc-open')) chatClose();
       });
     })
     .catch(function () { /* silent — chrome is optional */ });
