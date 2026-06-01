@@ -95,6 +95,22 @@ export async function ensureStoreSchema(pool, slug) {
 }
 
 /**
+ * Create the SHARED cross-node newsroom profile table. NOT prefixed with the
+ * node slug — every Node reads/writes the same row per newsroom, so data a
+ * newsroom gives one Node (e.g. Audience Signal's geography/audience) is
+ * available to every other Node via host.profile. Call once at boot.
+ */
+export async function ensureProfileSchema(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS grounded_newsroom_profile (
+      newsroom_id text PRIMARY KEY,
+      data        jsonb NOT NULL DEFAULT '{}'::jsonb,
+      updated_at  timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+}
+
+/**
  * Build a per-request host scoped to one newsroom.
  * @param {object} o
  * @param {import('pg').Pool} o.pool
@@ -221,11 +237,47 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
     },
   };
 
+  // SHARED cross-node newsroom profile (host.profile) — one merged object per
+  // newsroom, readable/writable by EVERY Node. get() seeds from the tracker's
+  // own newsroom_profile when the shared row is still empty, so existing tracker
+  // context flows into Nodes. See ensureProfileSchema().
+  const profile = {
+    get: async () => {
+      const r = await pool.query(`SELECT data FROM grounded_newsroom_profile WHERE newsroom_id=$1`, [newsroomId]);
+      if (r.rows.length && r.rows[0].data && Object.keys(r.rows[0].data).length) return r.rows[0].data;
+      // Seed from the tracker's single-row newsroom_profile (bridge existing data).
+      try {
+        const t = await pool.query(
+          `SELECT about, beats, audience, strengths, style_notes, trusted_sources
+             FROM newsroom_profile ORDER BY created_at LIMIT 1`);
+        if (t.rows.length) {
+          const p = t.rows[0], seed = {};
+          if (p.about) seed.about = p.about;
+          if (p.audience) seed.audience = p.audience;
+          if (p.beats) seed.beats_note = p.beats;
+          if (p.strengths) seed.strengths = p.strengths;
+          return seed;
+        }
+      } catch { /* tracker table may not exist in a standalone DB */ }
+      return {};
+    },
+    set: async (patch) => {
+      const cur = await profile.get();
+      const next = { ...cur, ...(patch || {}), updated_at: new Date().toISOString() };
+      await pool.query(
+        `INSERT INTO grounded_newsroom_profile (newsroom_id, data) VALUES ($1, $2::jsonb)
+         ON CONFLICT (newsroom_id) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`,
+        [newsroomId, JSON.stringify(next)]);
+      return next;
+    },
+  };
+
   return {
     ctx,
     tablePrefix: PREFIX,
     meta,
     store,
+    profile,
     db,
     ai: { chat },
     parse: { docxToHtml: async (buffer) => (await mammoth.convertToHtml({ buffer })).value },

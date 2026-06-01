@@ -28,7 +28,7 @@ import express from "express";
 import multer from "multer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createPgHost, ensureActivitySchema, ensureStoreSchema } from "./host-pg.js";
+import { createPgHost, ensureActivitySchema, ensureStoreSchema, ensureProfileSchema } from "./host-pg.js";
 import { readRuntimeVersion } from "./chrome.js";
 
 const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
@@ -103,6 +103,7 @@ export async function createHostedServer({
   const pool = new pg.Pool(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {});
   await ensureActivitySchema(pool, slug);
   await ensureStoreSchema(pool, slug);
+  await ensureProfileSchema(pool);   // shared cross-node newsroom profile
   if (typeof ensureSchema === "function") await ensureSchema(pool);
 
   // The tracker's JWT payload is { id, email, role, sector_ids } — no org id, so

@@ -273,11 +273,26 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
     },
   };
 
+  // Cross-node newsroom profile (host.profile) — same interface as the hosted
+  // host. Locally each install is its own newsroom, so this is a single shared
+  // JSON file the Node reads/writes; genuine cross-Node sharing happens hosted
+  // (one Postgres row per newsroom). One merged object; set() shallow-merges.
+  const profileFile = tableFile("grounded_newsroom_profile");
+  const profile = {
+    get: async () => readJson(profileFile, {}) || {},
+    set: async (patch) => {
+      const next = { ...(readJson(profileFile, {}) || {}), ...(patch || {}), updated_at: new Date().toISOString() };
+      writeJson(profileFile, next);
+      return next;
+    },
+  };
+
   return {
     ctx,
     tablePrefix: prefix,
     meta,  // sticky install identity — server reads this for /api/grounded/meta
     store,
+    profile,
 
     db: {
       query,
