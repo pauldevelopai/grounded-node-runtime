@@ -136,8 +136,17 @@ export async function createHostedServer({
   // just edit chrome.js and pull the nodes repo on the box. It's auth-aware on
   // its own (GET /api/auth/me), so no per-user templating is needed here. We keep
   // only the Node-specific "run it locally" footer.
+  // A Node's index.html opts into the LOCAL chrome with two tags
+  // (grounded-chrome.css / grounded-chrome.js) that mountChrome serves in
+  // standalone mode. Hosted has no such routes, so left in place they fall
+  // through to the auth catch-all below: anonymous users get a 302 to /login,
+  // signed-in users get the HTML page back — which the browser then refuses to
+  // run as CSS/JS, one wasted round-trip + console error per load. Hosted gets
+  // its chrome from the shared /nodes/chrome.js (injected below), so strip them.
   const rawIndex = readFileSync(join(staticDir, "index.html"), "utf8");
   const INDEX_HTML = rawIndex
+    .replace(/[ \t]*<link\b[^>]*\bgrounded-chrome\.css\b[^>]*>\s*\n?/i, "")
+    .replace(/[ \t]*<script\b[^>]*\bgrounded-chrome\.js\b[^>]*><\/script>\s*\n?/i, "")
     .replace("</body>", `${footerHtml(slug, repoName)}\n<script src="/nodes/chrome.js" defer></script>\n</body>`);
   const pageFor = () => INDEX_HTML;
 
