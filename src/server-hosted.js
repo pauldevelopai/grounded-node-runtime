@@ -80,6 +80,11 @@ export async function createHostedServer({
   port = process.env.PORT || 3002,
   staticDir = "public",
   uploadLimitMb = 25,
+  // JSON bodies default to Express's 100 KB cap, but Nodes post images inline as
+  // base64 (e.g. Election Watch's "Check claim" screenshot), which blows past it.
+  // Match the file-upload allowance so an inline image is never rejected — a
+  // rejection here surfaces to the browser as an HTML 413 the frontend can't parse.
+  jsonLimitMb = uploadLimitMb,
 } = {}) {
   if (!slug) throw new Error("createHostedServer: slug is required");
 
@@ -153,7 +158,7 @@ export async function createHostedServer({
 
   const app = express();
   app.set("trust proxy", true);
-  app.use(express.json());
+  app.use(express.json({ limit: `${jsonLimitMb}mb` }));
   app.use(cookieParser());
 
   const hostFor = (req) => createPgHost({
@@ -218,6 +223,24 @@ export async function createHostedServer({
       return res.redirect(`${LOGIN_URL}${next}`);
     }
     res.type("html").send(pageFor(user));
+  });
+
+  // Body-parser (and any other) errors would otherwise fall to Express's default
+  // handler, which replies with an HTML page — and every /api/* caller does
+  // res.json(), so it dies on "Unexpected token '<'". Answer /api/* in JSON so an
+  // oversized or malformed payload is a readable error, not a mystery parse crash.
+  app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = err.status || err.statusCode || 500;
+    if (req.path.startsWith("/api/")) {
+      const tooLarge = err.type === "entity.too.large" || status === 413;
+      return res.status(status).json({
+        error: tooLarge
+          ? `That upload is too large (limit ${jsonLimitMb}MB). Try a smaller image.`
+          : err.message || "Request failed.",
+      });
+    }
+    return res.status(status).type("text").send(err.message || "Request failed.");
   });
 
   app.listen(port, () => {
