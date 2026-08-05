@@ -38,13 +38,16 @@ export function createServer({
   nodeVersion,
   port = process.env.PORT || 3000,
   staticDir = "public",
-  uploadLimitMb = 25
+  uploadLimitMb = 25,
+  // Match the file-upload allowance: Nodes post images inline as base64, which
+  // exceeds Express's default 100 KB JSON cap. See server-hosted.js for detail.
+  jsonLimitMb = uploadLimitMb
 }) {
   if (!slug) throw new Error("createServer: slug is required");
   if (!host) throw new Error("createServer: host is required");
 
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: `${jsonLimitMb}mb` }));
   app.use(express.static(staticDir));
 
   // GROUNDED chrome — family branding + telemetry endpoint. Nodes opt in
