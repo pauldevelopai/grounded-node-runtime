@@ -3,7 +3,7 @@
 Shared scaffolding every GROUNDED Node builds on. Part of **Grounded** (newsroom-owned
 AI by Develop AI). A Node = a small app whose handlers target a **host interface**
 (`host.db / host.store / host.ai / host.parse / host.log / host.feedback / host.meta /
-host.tablePrefix`) so the *same handlers* run two ways. **Current tag: `v0.14.0`** (the tracker's
+host.tablePrefix`) so the *same handlers* run two ways. **Current tag: `v0.14.1`** (the tracker's
 `CLAUDE.md` is the source of truth if this line lags).
 
 ## Hosted chrome — IMPORTANT (v0.10.0)
