@@ -3,7 +3,7 @@
 Shared scaffolding every GROUNDED Node builds on. Part of **Grounded** (newsroom-owned
 AI by Develop AI). A Node = a small app whose handlers target a **host interface**
 (`host.db / host.store / host.ai / host.parse / host.log / host.feedback / host.meta /
-host.tablePrefix`) so the *same handlers* run two ways. **Current tag: `v0.14.1`** (the tracker's
+host.tablePrefix`) so the *same handlers* run three ways (local web / hosted multi-tenant / MCP tools). **Current tag: `v0.15.0`** (the tracker's
 `CLAUDE.md` is the source of truth if this line lags).
 
 ## Hosted chrome — IMPORTANT (v0.10.0)
@@ -23,11 +23,12 @@ Node-specific "run it locally" footer is still emitted by the runtime.
   - `mountRoutes(app, { hostFor, readUser })` — optional; attach custom routes. `hostFor(req)` returns a per-request, newsroom-scoped host (the **node-verifier** pattern, for its `/api/listener/*` routes).
 - **`host.store`** — per-newsroom key/value, identical API local + hosted: `list(collection)` / `get(collection,key)` / `put(collection,key,value)` / `delete(collection,key)`. Locally backed by JSON files; online by a `node_<slug>_store(newsroom_id,collection,key,value jsonb,…)` table. This is what lets a file-based Node go multi-tenant without writing SQL.
 - **`createPgHost` / `ensureActivitySchema` / `ensureStoreSchema`** (`host-pg.js`) — the multi-tenant Postgres host + the generic `node_<slug>_activity` and `node_<slug>_store` tables (both auto-created by `createHostedServer`). A Node's *own* relational tables come from the `ensureSchema` it passes.
+- **`createMcpServer({ slug, productName, nodeVersion, host, handlers, tools, transport? })`** + **`redirectConsoleForStdio`** (`server-mcp.js`) — the MCP boot: projects a Node's curated `lib/mcp-tools.js` manifest as MCP tools over the SAME `(host, args)` handler contract. Default transport stdio (Claude Desktop). Call `redirectConsoleForStdio()` BEFORE creating the host — stdout is the JSON-RPC channel and the lite host logs to it. Blueprint: `grounded2026/docs/MCP_BLUEPRINT.md`; reference Node: `node-verifier` (`mcp-server.js` + `lib/mcp-tools.js` + `MCP.md`).
 - `mountChrome`, `readRuntimeVersion` (`chrome.js`); `telemetry.js` (collector POST when `GROUNDED_TELEMETRY_URL` set).
 
 ## Deps
 Regular: express, multer, mammoth, @anthropic-ai/sdk, openai, dotenv (used by local + hosted).
-**optionalDependencies**: pg, cookie-parser, jsonwebtoken — used ONLY by `createHostedServer`, **lazy-imported** so a newsroom's local install never loads or needs them.
+**optionalDependencies**: pg, cookie-parser, jsonwebtoken (used ONLY by `createHostedServer`) + @modelcontextprotocol/sdk (used ONLY by `createMcpServer`) — all **lazy-imported**, so nothing loads them unless that boot mode runs.
 
 ## Versioning — IMPORTANT
 Nodes consume this via `github:pauldevelopai/grounded-node-runtime#vX.Y.Z`. When you change the runtime: bump `package.json` version, commit, **and move the matching git tag** (`git tag -f vX.Y.Z && git push -f origin vX.Y.Z`), then bump the tag in each Node's `package.json`.
