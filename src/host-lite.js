@@ -33,6 +33,7 @@ import mammoth from "mammoth";
 import { readRuntimeVersion } from "./chrome.js";
 import { postTelemetry } from "./telemetry.js";
 import { harvestCitations } from "./host-pg.js";
+import { validateCorpusRecord } from "./corpus.js";
 
 const DEFAULT_DATA_DIR = "data/processed";
 const STANDALONE_NEWSROOM_ID = "local";
@@ -287,12 +288,76 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
     },
   };
 
+  // Corpus write-back (host.corpus) — same interface as the hosted host, backed
+  // by one shared JSON file. Locally the records accumulate in the install's
+  // fork; hosted, the SAME handler calls land in the platform's shared
+  // grounded_corpus_records table. Dedup mirrors the hosted rules: source_url
+  // first, title+date when no URL. See src/corpus.js for the contract.
+  const corpusFile = tableFile("grounded_corpus_records");
+  const corpusRows = () => readJson(corpusFile, []);
+  const sameRecord = (row, r) => row.collection === r.collection && (
+    r.source_url ? row.source_url === r.source_url
+                 : (!row.source_url && row.title === r.title && (row.record_date || null) === (r.date || null)));
+  const corpus = {
+    add: async (record) => {
+      const r = validateCorpusRecord(record);
+      const rows = corpusRows();
+      const dup = rows.find((row) => sameRecord(row, r));
+      if (dup) return { id: dup.id, inserted: false };
+      const now = new Date().toISOString();
+      const row = {
+        id: randomUUID(),
+        collection: r.collection, newsroom_id: ctx.newsroomId, node_slug: appSlug,
+        title: r.title, source_url: r.source_url, record_date: r.date,
+        jurisdiction: r.jurisdiction, language: r.language, licence: r.licence,
+        summary: r.summary, entity: r.entity,
+        verification_status: r.verification_status, verified_by: r.verified_by,
+        verified_at: r.verification_status === "human_verified" ? now : null,
+        outcome: r.outcome, extra: r.extra, created_at: now, updated_at: now,
+      };
+      rows.push(row);
+      writeJson(corpusFile, rows);
+      return { id: row.id, inserted: true };
+    },
+    get: async (id) => corpusRows().find((row) => row.id === id) || null,
+    list: async ({ collection, entity, verification_status, limit = 50, offset = 0 } = {}) =>
+      corpusRows()
+        .filter((row) => (!collection || row.collection === collection)
+          && (!entity || row.entity === entity)
+          && (!verification_status || row.verification_status === verification_status))
+        .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+        .slice(offset, offset + Math.min(limit, 500)),
+    verify: async (id, verifiedBy) => {
+      if (!verifiedBy || !String(verifiedBy).trim()) {
+        throw new Error("verify requires the verifier's name — verification is a named person's act");
+      }
+      const rows = corpusRows();
+      const row = rows.find((x) => x.id === id);
+      if (!row) return null;
+      row.verification_status = "human_verified";
+      row.verified_by = String(verifiedBy).trim();
+      row.verified_at = row.updated_at = new Date().toISOString();
+      writeJson(corpusFile, rows);
+      return row;
+    },
+    setOutcome: async (id, outcome) => {
+      const rows = corpusRows();
+      const row = rows.find((x) => x.id === id);
+      if (!row) return null;
+      row.outcome = outcome || null;
+      row.updated_at = new Date().toISOString();
+      writeJson(corpusFile, rows);
+      return row;
+    },
+  };
+
   return {
     ctx,
     tablePrefix: prefix,
     meta,  // sticky install identity — server reads this for /api/grounded/meta
     store,
     profile,
+    corpus,
 
     db: {
       query,

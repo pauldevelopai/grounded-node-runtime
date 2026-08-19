@@ -18,6 +18,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import mammoth from "mammoth";
+import { createCorpusApi } from "./corpus.js";
 
 const prefixFor = (slug) => `node_${String(slug).replace(/-/g, "_")}_`;
 
@@ -272,12 +273,18 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
     },
   };
 
+  // SHARED corpus write-back (host.corpus) — every Node's gathered data lands
+  // in grounded_corpus_records wearing the standard shape, scoped per newsroom.
+  // See ensureCorpusSchema() / src/corpus.js for the contract.
+  const corpus = createCorpusApi({ pool, newsroomId, nodeSlug: slug });
+
   return {
     ctx,
     tablePrefix: PREFIX,
     meta,
     store,
     profile,
+    corpus,
     db,
     ai: { chat },
     parse: { docxToHtml: async (buffer) => (await mammoth.convertToHtml({ buffer })).value },

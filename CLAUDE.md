@@ -2,8 +2,8 @@
 
 Shared scaffolding every GROUNDED Node builds on. Part of **Grounded** (newsroom-owned
 AI by Develop AI). A Node = a small app whose handlers target a **host interface**
-(`host.db / host.store / host.ai / host.parse / host.log / host.feedback / host.meta /
-host.tablePrefix`) so the *same handlers* run three ways (local web / hosted multi-tenant / MCP tools). **Current tag: `v0.15.0`** (the tracker's
+(`host.db / host.store / host.profile / host.corpus / host.ai / host.parse / host.log /
+host.feedback / host.meta / host.tablePrefix`) so the *same handlers* run three ways (local web / hosted multi-tenant / MCP tools). **Current tag: `v0.16.0`** (the tracker's
 `CLAUDE.md` is the source of truth if this line lags).
 
 ## Hosted chrome — IMPORTANT (v0.10.0)
@@ -22,7 +22,8 @@ Node-specific "run it locally" footer is still emitted by the runtime.
   - `ensureSchema(pool, slug)` — optional; create your `node_<slug>_*` tables (the **node-analytics** pattern).
   - `mountRoutes(app, { hostFor, readUser })` — optional; attach custom routes. `hostFor(req)` returns a per-request, newsroom-scoped host (the **node-verifier** pattern, for its `/api/listener/*` routes).
 - **`host.store`** — per-newsroom key/value, identical API local + hosted: `list(collection)` / `get(collection,key)` / `put(collection,key,value)` / `delete(collection,key)`. Locally backed by JSON files; online by a `node_<slug>_store(newsroom_id,collection,key,value jsonb,…)` table. This is what lets a file-based Node go multi-tenant without writing SQL.
-- **`createPgHost` / `ensureActivitySchema` / `ensureStoreSchema`** (`host-pg.js`) — the multi-tenant Postgres host + the generic `node_<slug>_activity` and `node_<slug>_store` tables (both auto-created by `createHostedServer`). A Node's *own* relational tables come from the `ensureSchema` it passes.
+- **`host.corpus`** (v0.16.0) — the corpus write-back: everything a Node gathers lands in one of the FIVE shared corpora (`CORPUS_COLLECTIONS`) wearing the standard record shape (`source_url · date · jurisdiction · language · licence · verification_status · outcome`). API: `add(record)` (validated + deduped on source_url, else title+date; returns `{id, inserted}` so counts stay honest) / `get(id)` / `list(filters)` / `verify(id, verifiedBy)` (named person REQUIRED — `human_verified` is a person's signature) / `setOutcome(id, outcome)`. Locally a JSON file; hosted the SHARED unprefixed `grounded_corpus_records` table (canonical DDL = tracker migrations `171_corpus_records.sql` + `172_corpus_usage.sql`; `ensureCorpusSchema` carries identical copies — keep in sync). Hosted READ ops (`get`/`list`) self-log to `corpus_usage` (surface `host_corpus`) — the per-corpus query counts the Foundation reports to funders; writes are evidenced by the records themselves. Exports: `CORPUS_COLLECTIONS`, `validateCorpusRecord`, `ensureCorpusSchema`, `createCorpusApi` (`corpus.js`).
+- **`createPgHost` / `ensureActivitySchema` / `ensureStoreSchema` / `ensureProfileSchema`** (`host-pg.js`) — the multi-tenant Postgres host + the generic `node_<slug>_activity` and `node_<slug>_store` tables (both auto-created by `createHostedServer`). A Node's *own* relational tables come from the `ensureSchema` it passes.
 - **`createMcpServer({ slug, productName, nodeVersion, host, handlers, tools, transport? })`** + **`redirectConsoleForStdio`** (`server-mcp.js`) — the MCP boot: projects a Node's curated `lib/mcp-tools.js` manifest as MCP tools over the SAME `(host, args)` handler contract. Default transport stdio (Claude Desktop). Call `redirectConsoleForStdio()` BEFORE creating the host — stdout is the JSON-RPC channel and the lite host logs to it. Blueprint: `grounded2026/docs/MCP_BLUEPRINT.md`; reference Node: `node-verifier` (`mcp-server.js` + `lib/mcp-tools.js` + `MCP.md`).
 - `mountChrome`, `readRuntimeVersion` (`chrome.js`); `telemetry.js` (collector POST when `GROUNDED_TELEMETRY_URL` set).
 

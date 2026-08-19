@@ -29,6 +29,7 @@ import multer from "multer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createPgHost, ensureActivitySchema, ensureStoreSchema, ensureProfileSchema } from "./host-pg.js";
+import { ensureCorpusSchema } from "./corpus.js";
 import { readRuntimeVersion } from "./chrome.js";
 
 const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
@@ -109,6 +110,7 @@ export async function createHostedServer({
   await ensureActivitySchema(pool, slug);
   await ensureStoreSchema(pool, slug);
   await ensureProfileSchema(pool);   // shared cross-node newsroom profile
+  await ensureCorpusSchema(pool);    // shared corpus write-back (host.corpus)
   if (typeof ensureSchema === "function") await ensureSchema(pool);
 
   // The tracker's JWT payload is { id, email, role, sector_ids } — no org id, so
