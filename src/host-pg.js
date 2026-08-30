@@ -17,6 +17,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import mammoth from "mammoth";
 import { createCorpusApi } from "./corpus.js";
 
@@ -151,24 +152,156 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
     }
   };
 
-  // AI: single shared server key, cheap model. Same return shape as the lite host.
-  let anthropic = null;
-  const client = () => {
-    if (!anthropic) {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        throw new Error("Server AI key (ANTHROPIC_API_KEY) is not configured.");
-      }
-      anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  // ── AI: WHOSE KEY? ────────────────────────────────────────────────────────
+  //
+  // A hosted Node runs on our server, but not necessarily on our bill. The
+  // tracker decides per Node (node_billing_policy) and per newsroom
+  // (newsroom_llm_keys):
+  //
+  //   payer 'newsroom' → the newsroom's own Anthropic or OpenAI key, their bill.
+  //                      No key on file means an actionable refusal, NOT a quiet
+  //                      fallback to ours.
+  //   payer 'system'   → Develop AI's key, after the `nodes` budget is checked.
+  //
+  // The tracker is asked rather than the database read directly, because the
+  // newsroom's key is encrypted with a per-tenant HKDF key. Reimplementing that
+  // crypto here would mean keeping two copies byte-compatible forever, with a
+  // credential at the end of it.
+  //
+  // Local (downloaded) Nodes never come through here — host-lite.js reads the
+  // newsroom's own .env, which is already BYO by construction.
+
+  const TRACKER = process.env.TRACKER_INTERNAL_URL || "http://127.0.0.1:3001";
+  const INTERNAL_SECRET = process.env.INTERNAL_NODE_SECRET || "";
+
+  // Resolved credentials are cached briefly so a chatty Node doesn't ask the
+  // tracker on every call. Short, because revoking a key or flipping a Node's
+  // payer should take effect in about a minute, not on restart.
+  let credCache = { at: 0, value: null };
+  const CRED_TTL_MS = 60_000;
+
+  async function trackerPost(path, body) {
+    const res = await fetch(`${TRACKER}/api/internal/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-internal-secret": INTERNAL_SECRET },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`tracker /${path} returned ${res.status}`);
+    return res.json();
+  }
+
+  /** An error a Node can show the user verbatim. Not a fault to retry. */
+  function billingError(code, message) {
+    const err = new Error(message);
+    err.code = code;
+    err.billing = true;          // handlers can branch on this
+    err.userFacing = true;
+    return err;
+  }
+
+  async function credentials() {
+    if (credCache.value && Date.now() - credCache.at < CRED_TTL_MS) return credCache.value;
+    if (!INTERNAL_SECRET) {
+      throw billingError("not_configured",
+        "This server is not configured to resolve AI credentials (INTERNAL_NODE_SECRET is unset).");
     }
+    let out;
+    try {
+      out = await trackerPost("node-llm-key", { slug, newsroom_id: newsroomId });
+    } catch (err) {
+      // The tracker being unreachable is an outage, not a billing answer — don't
+      // cache it, and don't dress it up as "add your key".
+      throw new Error(`Could not reach the credential service: ${err.message}`);
+    }
+    if (!out.ok) throw billingError(out.code, out.message);
+    credCache = { at: Date.now(), value: out };
+    return out;
+  }
+
+  let anthropic = null, openai = null, clientKey = null;
+  function clientFor(cred) {
+    // Rebuild if the key changed under us (payer flipped, or key replaced).
+    if (clientKey !== cred.key) { anthropic = null; openai = null; clientKey = cred.key; }
+    if (cred.provider === "openai") {
+      if (!openai) openai = new OpenAI({ apiKey: cred.key });
+      return openai;
+    }
+    if (!anthropic) anthropic = new Anthropic({ apiKey: cred.key });
     return anthropic;
-  };
+  }
+  /** Report what a call cost so it lands in the tracker's ledger. Never throws. */
+  async function reportUsage(cred, model, usage) {
+    try {
+      await trackerPost("node-llm-usage", {
+        surface: cred.surface, model, usage: usage || {},
+        payer: cred.payer, newsroom_id: newsroomId
+      });
+    } catch (err) {
+      // A lost usage record must not lose the user's answer — but for a
+      // system-paid Node it means our cap is briefly blind, so say so.
+      console.warn(`[ai] usage not recorded (${cred.payer}-paid): ${err.message}`);
+    }
+  }
+
+  /** A provider rejecting the key is the newsroom's problem to fix — tell them. */
+  async function flagKeyRejected(cred, err) {
+    if (cred.payer !== "newsroom") return;
+    credCache = { at: 0, value: null };   // re-resolve next call
+    try {
+      await trackerPost("node-key-failed", { newsroom_id: newsroomId, message: err.message });
+    } catch { /* best effort */ }
+  }
+
+  function isAuthError(err) {
+    const status = err?.status || err?.statusCode;
+    return status === 401 || status === 403;
+  }
+
   async function chat(input, opts = {}) {
     // opts.webSearch (true | { maxUses }) turns on Claude's server-side web
     // search tool — Anthropic runs the searches and returns the final answer
     // with citations in a single call. Lets a Node fact-check against the live
     // web instead of training knowledge alone.
-    const model = opts.model || process.env.MODEL || "claude-haiku-4-5";
+    //
+    // NOTE ON COST: each search bills $10/1,000 ($0.01) ON TOP of tokens, which
+    // is roughly what an entire cheap-model call costs. Whoever is paying,
+    // webSearch is the expensive option — keep maxUses low.
+    const cred = await credentials();
     const messages = typeof input === "string" ? [{ role: "user", content: input }] : input;
+
+    // ── OpenAI (a newsroom may bring either key) ────────────────────────────
+    if (cred.provider === "openai") {
+      const model = opts.model || process.env.OPENAI_MODEL || "gpt-5.4-mini";
+      if (opts.webSearch) {
+        // Don't silently drop a caller's request for grounded answers.
+        console.warn("[ai] webSearch requested but this newsroom's key is OpenAI — answering without search");
+      }
+      try {
+        const res = await clientFor(cred).chat.completions.create({
+          model,
+          max_tokens: opts.maxTokens || 1000,
+          messages: opts.system ? [{ role: "system", content: opts.system }, ...messages] : messages
+        });
+        const u = res.usage || {};
+        await reportUsage(cred, model, {
+          input_tokens: u.prompt_tokens || 0, output_tokens: u.completion_tokens || 0
+        });
+        return {
+          text: (res.choices?.[0]?.message?.content || "").trim(),
+          provider: "openai", model, payer: cred.payer, usedFallback: false, citations: []
+        };
+      } catch (err) {
+        if (isAuthError(err)) {
+          await flagKeyRejected(cred, err);
+          throw billingError("key_rejected",
+            "Your OpenAI API key was rejected. Check it in Settings — it may have been revoked or run out of credit.");
+        }
+        throw err;
+      }
+    }
+
+    // ── Anthropic ───────────────────────────────────────────────────────────
+    const model = opts.model || process.env.MODEL || "claude-haiku-4-5";
     const params = {
       model,
       max_tokens: opts.maxTokens || 1000,
@@ -179,11 +312,22 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
       const maxUses = (typeof opts.webSearch === "object" && opts.webSearch.maxUses) || 5;
       params.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: maxUses }];
     }
-    const msg = await client().messages.create(params);
-    const textBlocks = (msg.content || []).filter(b => b.type === "text");
-    const text = textBlocks.map(b => b.text).join("\n").trim();
-    const citations = harvestCitations(msg.content);
-    return { text, provider: "anthropic", model, usedFallback: false, citations };
+    try {
+      const msg = await clientFor(cred).messages.create(params);
+      await reportUsage(cred, model, msg.usage);
+      const textBlocks = (msg.content || []).filter(b => b.type === "text");
+      const text = textBlocks.map(b => b.text).join("\n").trim();
+      const citations = harvestCitations(msg.content);
+      return { text, provider: "anthropic", model, payer: cred.payer, usedFallback: false, citations };
+    } catch (err) {
+      if (isAuthError(err)) {
+        await flagKeyRejected(cred, err);
+        throw billingError("key_rejected", cred.payer === "newsroom"
+          ? "Your Anthropic API key was rejected. Check it in Settings — it may have been revoked or run out of credit."
+          : "Develop AI's AI key was rejected. This is a server-side problem, not yours.");
+      }
+      throw err;
+    }
   }
 
   async function appendActivity(entry) {
