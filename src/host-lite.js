@@ -189,7 +189,14 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
           "check your .env file (or set AI_PROVIDER=openai if that's the key you have)"
         );
       }
-      anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      // Identity-linked keys need anthropic-workspace-id on every request; a
+      // plain workspace key ignores it. Newsrooms set ANTHROPIC_WORKSPACE_ID in
+      // their own .env alongside the key if their key is the identity-linked kind.
+      const ws = (process.env.ANTHROPIC_WORKSPACE_ID || '').trim();
+      anthropicClient = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        ...(ws ? { defaultHeaders: { 'anthropic-workspace-id': ws } } : {}),
+      });
     }
     return anthropicClient;
   }

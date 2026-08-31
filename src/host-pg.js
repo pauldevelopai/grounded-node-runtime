@@ -226,7 +226,17 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
       if (!openai) openai = new OpenAI({ apiKey: cred.key });
       return openai;
     }
-    if (!anthropic) anthropic = new Anthropic({ apiKey: cred.key });
+    if (!anthropic) {
+      // An identity-linked Anthropic key is rejected on every request without
+      // anthropic-workspace-id. Harmless on a normal workspace key, so it is set
+      // whenever the id is available: the system key uses the box's
+      // ANTHROPIC_WORKSPACE_ID; a newsroom's own key uses theirs if they gave one.
+      const ws = (cred.workspace_id || process.env.ANTHROPIC_WORKSPACE_ID || '').trim();
+      anthropic = new Anthropic({
+        apiKey: cred.key,
+        ...(ws ? { defaultHeaders: { 'anthropic-workspace-id': ws } } : {}),
+      });
+    }
     return anthropic;
   }
   /** Report what a call cost so it lands in the tracker's ledger. Never throws. */
