@@ -31,6 +31,10 @@ export const CORPUS_COLLECTIONS = [
   "policy_standards",     // policy & standards library
   "governance_registers", // client governance registers
   "news_opportunities",   // news & opportunities archive
+  // Added 2026-08-31 (tracker migration 189). Election Watch's record of specific
+  // misinformation claims — what circulated, where, which tier, and the
+  // journalist's verdict. Distinct from newsroom_ai, which is about ADOPTION.
+  "misinformation_record",
 ];
 
 const VERIFICATION_STATUSES = ["ai_drafted", "human_verified"];
@@ -81,12 +85,15 @@ export function validateCorpusRecord({
  * Mirror of the tracker's canonical migration 171_corpus_records.sql.
  */
 export async function ensureCorpusSchema(pool) {
+  // Generated from CORPUS_COLLECTIONS rather than written out, so adding a
+  // collection to the list above is the only edit a new collection needs here.
+  // The names are our own constants, never user input.
+  const COLLECTION_CHECK = CORPUS_COLLECTIONS.map((c) => `'${c}'`).join(",");
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS grounded_corpus_records (
       id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      collection    text NOT NULL CHECK (collection IN
-                      ('ai_law_regulation','newsroom_ai','policy_standards',
-                       'governance_registers','news_opportunities')),
+      collection    text NOT NULL CHECK (collection IN (${COLLECTION_CHECK})),
       newsroom_id   text NOT NULL,
       node_slug     text,
       title         text NOT NULL,
@@ -128,6 +135,31 @@ export async function ensureCorpusSchema(pool) {
     CREATE INDEX IF NOT EXISTS corpus_usage_by_corpus ON corpus_usage (corpus, ts);
     CREATE INDEX IF NOT EXISTS corpus_usage_by_surface ON corpus_usage (surface, ts);
   `);
+
+  // CREATE TABLE IF NOT EXISTS does nothing to a table that already exists, so a
+  // database created before a collection was added still carries the old CHECK
+  // and would reject every write to the new collection. The tracker's own
+  // migrations cover the shared database; this covers everywhere else, and makes
+  // the runtime self-sufficient instead of dependent on migration ordering.
+  //
+  // Only fires when the constraint is actually behind, so the ACCESS EXCLUSIVE
+  // lock is paid once rather than on every Node boot.
+  const { rows } = await pool.query(
+    `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+      WHERE conrelid = 'grounded_corpus_records'::regclass AND conname = $1`,
+    ["grounded_corpus_records_collection_check"]);
+  const def = rows[0]?.def || "";
+  const missing = def && CORPUS_COLLECTIONS.filter((c) => !def.includes(`'${c}'`));
+  if (missing && missing.length) {
+    console.log(`[corpus] widening the collection constraint for: ${missing.join(", ")}`);
+    await pool.query(`
+      ALTER TABLE grounded_corpus_records
+        DROP CONSTRAINT grounded_corpus_records_collection_check;
+      ALTER TABLE grounded_corpus_records
+        ADD CONSTRAINT grounded_corpus_records_collection_check
+        CHECK (collection IN (${COLLECTION_CHECK}));
+    `);
+  }
 }
 
 const RETURN_COLS = `id, collection, newsroom_id, node_slug, title, source_url,

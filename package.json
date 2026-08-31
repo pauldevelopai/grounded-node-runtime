@@ -1,6 +1,6 @@
 {
   "name": "@developai/grounded-node-runtime",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "Shared scaffolding for GROUNDED Nodes: lite host (storage/AI/parse/log shim) + Express server boot + family chrome and telemetry endpoint. Mirrors the GROUNDED facade interface so the same Node code runs standalone on a newsroom laptop and integrated into the GROUNDED monorepo.",
   "license": "Apache-2.0",
   "type": "module",
@@ -28,7 +28,7 @@
     "mammoth": "^1.8.0",
     "multer": "^1.4.5-lts.1"
   },
-  "comment_hostedDependencies": "Only createHostedServer (online multi-tenant mode) uses these, and it imports them lazily \u2014 so a newsroom's LOCAL install never loads or needs them. Optional so a flaky build (e.g. pg native bits) can't break a local install.",
+  "comment_hostedDependencies": "Only createHostedServer (online multi-tenant mode) uses these, and it imports them lazily — so a newsroom's LOCAL install never loads or needs them. Optional so a flaky build (e.g. pg native bits) can't break a local install.",
   "optionalDependencies": {
     "pg": "^8.13.1",
     "cookie-parser": "^1.4.7",
