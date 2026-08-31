@@ -70,6 +70,16 @@ export function createLiteHost({ appSlug, dataDir = DEFAULT_DATA_DIR, nodeVersio
     node_version: nodeVersion || prevMeta?.node_version || "unknown",
     runtime_version: runtimeVersion,
     newsroom: newsroom || prevMeta?.newsroom || null,
+    // Same shape as the hosted host's meta.org, so a Node writing a record about
+    // "this newsroom" needs no branch. Locally the install IS the newsroom, and
+    // its country comes from its own .env — there is no directory to look it up
+    // in, and guessing one would be inventing data.
+    org: {
+      id: null,
+      name: newsroom || prevMeta?.newsroom || null,
+      country: process.env.NEWSROOM_COUNTRY || null,
+      kind: "newsroom",
+    },
     platform: prevMeta?.platform || `${os.platform()} ${os.arch()} node ${process.version}`,
     first_boot: prevMeta?.first_boot || new Date().toISOString(),
     last_boot: new Date().toISOString(),

@@ -121,7 +121,7 @@ export async function ensureProfileSchema(pool) {
  * @param {string=} o.newsroom    display name
  * @param {string=} o.nodeVersion
  */
-export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } = {}) {
+export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion, org = null } = {}) {
   if (!pool) throw new Error("createPgHost: pool is required");
   if (!slug) throw new Error("createPgHost: slug is required");
   if (!newsroomId) throw new Error("createPgHost: newsroomId is required");
@@ -360,7 +360,13 @@ export function createPgHost({ pool, slug, newsroomId, newsroom, nodeVersion } =
     newsroom: newsroom || null,
     node_version: nodeVersion || "unknown",
     runtime_version: "hosted",
-    host_id: null
+    host_id: null,
+    // The ORGANISATION the signed-in user belongs to — { id, name, country, kind }
+    // — or null when the session carries no newsroom. Distinct from `newsroom`
+    // above, which is the individual user, and from ctx.newsroomId, which is the
+    // storage tenant (also the user). Use this, not either of those, when writing
+    // a record ABOUT a newsroom: its name and its country.
+    org: org || null,
   };
 
   // Per-newsroom key/value store — same interface as the lite host's, backed by

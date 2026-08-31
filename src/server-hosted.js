@@ -113,10 +113,48 @@ export async function createHostedServer({
   await ensureCorpusSchema(pool);    // shared corpus write-back (host.corpus)
   if (typeof ensureSchema === "function") await ensureSchema(pool);
 
-  // The tracker's JWT payload is { id, email, role, sector_ids } — no org id, so
-  // we scope per user account (account == newsroom in the pilot).
+  // STORAGE TENANCY: one user account = one tenant. Every Node's stored data
+  // (host.store, host.db, host.profile, host.corpus) is keyed by USER id, not by
+  // the newsroom the user belongs to.
+  //
+  // The JWT does carry `newsroom_id` — the comment that once said otherwise was
+  // out of date — so scoping by newsroom is now possible. It is deliberately NOT
+  // done here: every row every hosted Node has ever written is keyed by user id,
+  // and changing this key without a migration would orphan all of it, including
+  // a live newsroom's claim history. Changing it is a data decision, not a code
+  // one. Until then, two journalists at the same newsroom are two tenants and
+  // cannot see each other's work.
   const tenantOf = (u) => String(u.id);
   const nameOf = (u) => u.email || null;
+
+  // WHO THE USER BELONGS TO — separate from tenancy, and safe to add.
+  //
+  // Storage stays keyed by user, but a record ABOUT a newsroom's practice has to
+  // name the newsroom, not the person. Without this, the corpus can say "some
+  // account ran 40 claim checks" and never "Capital FM, Zambia, ran 40 claim
+  // checks" — which is the whole point of an African newsroom AI record. It also
+  // gives a record its real jurisdiction instead of one guessed from an env var
+  // shared by every tenant on a multi-tenant Node.
+  //
+  // Cached because it is one small row per newsroom and it changes about never.
+  const orgCache = new Map();
+  async function orgOf(user) {
+    const id = user?.newsroom_id ? String(user.newsroom_id) : null;
+    if (!id) return null;
+    if (orgCache.has(id)) return orgCache.get(id);
+    let org = { id, name: null, country: null, kind: null };
+    try {
+      const r = await pool.query(
+        "SELECT name, country, kind FROM newsrooms WHERE id = $1", [id]);
+      if (r.rows[0]) org = { id, ...r.rows[0] };
+    } catch (err) {
+      // A Node running against a database with no `newsrooms` table (a newsroom
+      // self-hosting, say) still works — it just has no org identity to report.
+      console.warn(`[org] could not read the newsroom row for ${id}: ${err.message}`);
+    }
+    orgCache.set(id, org);
+    return org;
+  }
 
   function readUser(req) {
     const cookies = req.cookies || {};
@@ -163,15 +201,22 @@ export async function createHostedServer({
   app.use(express.json({ limit: `${jsonLimitMb}mb` }));
   app.use(cookieParser());
 
+  // Stays synchronous — every Node's mountRoutes calls it inside a request
+  // handler. The org lookup it needs is done once by the middleware below and
+  // left on req.org.
   const hostFor = (req) => createPgHost({
     pool, slug, newsroomId: tenantOf(req.user), newsroom: nameOf(req.user), nodeVersion,
+    org: req.org || null,
   });
 
   // Every /api/* call needs a valid tracker session.
-  app.use("/api", (req, res, next) => {
+  app.use("/api", async (req, res, next) => {
     const user = readUser(req);
     if (!user) return res.status(401).json({ error: "Not signed in.", login: LOGIN_URL });
     req.user = user;
+    // Resolved here rather than in hostFor so that stays synchronous. Never fatal
+    // — a request must not fail because we could not name the user's newsroom.
+    try { req.org = await orgOf(user); } catch { req.org = null; }
     next();
   });
 
