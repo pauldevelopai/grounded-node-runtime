@@ -24,29 +24,35 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const CHROME_CSS = `
-/* GROUNDED chrome — applied by every Node that opts in.
-   Family branding visible at top and bottom. Single CSS var block at
-   the top of this rule set so swapping colours is one-line work.
-   Light Grounded palette — matches the tracker + the /nodes/chrome.js nav. */
+/* GROUNDED chrome — the LOCAL-install chrome. A Node running on a newsroom's
+   own machine gets this; a HOSTED Node does not (createHostedServer strips the
+   grounded-chrome.css/js tags and injects the shared /nodes/chrome.js instead,
+   which carries the full platform nav). That's why there are no pillar tabs
+   here: a local Node has no tracker at its own origin to navigate to. What it
+   does carry is the family look, and one link out to the platform.
+
+   Palette = the Develop AI system (developai.co.za), matching the tracker's
+   tokens in client/src/index.css and the nodes front door. Var names are kept
+   for diff stability; --gc-blue is genuinely blue again after a spell as
+   terracotta. */
 
 #grounded-chrome {
-  /* Terracotta — the single Grounded accent, identical across the tracker,
-     the nodes front door and every Node bubble. (Var names kept for diff
-     stability; the values are now terracotta.) */
-  --gc-blue: #c4761b;
-  --gc-blue-deep: #a8543a;
-  --gc-blue-light: #e0a368;
+  --gc-blue: #4673AF;
+  --gc-blue-deep: #3A6099;
+  --gc-blue-light: #8FB0D8;
+  --gc-navy: #1B1C3D;
   --gc-bg: #ffffff;
-  --gc-bg-soft: #F8FAFC;
-  --gc-ink: #1A202C;
-  --gc-dim: #64748B;
-  --gc-border: #E2E8F0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --gc-bg-soft: #F4F6FA;
+  --gc-ink: #1B1C3D;
+  --gc-dim: #5A6180;
+  --gc-border: #DDE3EE;
+  font-family: 'Arimo', Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Top bar — slim white banner with a bottom border, matching the nav.
-   Sets parent-platform context the moment the page loads. */
+/* Top bar — slim navy banner with the steel rule under it, the same header
+   treatment as every other Grounded surface. Sets parent-platform context the
+   moment the page loads. */
 #grounded-chrome .gc-topbar {
   position: fixed;
   top: 0;
@@ -54,26 +60,28 @@ const CHROME_CSS = `
   right: 0;
   height: 34px;
   z-index: 99998;
-  background: var(--gc-bg);
-  color: var(--gc-ink);
-  border-bottom: 1px solid var(--gc-border);
+  background: var(--gc-navy);
+  color: #E4E9F4;
+  border-bottom: 2px solid var(--gc-blue);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
   font-size: 12px;
   letter-spacing: 0.5px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 #grounded-chrome .gc-topbar .gc-mark {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  color: var(--gc-ink);
+  color: #ffffff;
   text-decoration: none;
-  font-weight: 700;
-  letter-spacing: 1.6px;
-  font-size: 12px;
+  /* Oswald, as on every other Grounded wordmark. Falls back to a condensed
+     system face — a local install may have no webfont available at all. */
+  font-family: 'Oswald', 'Arial Narrow', Impact, sans-serif;
+  font-weight: 500;
+  letter-spacing: 1.4px;
+  font-size: 13px;
 }
 #grounded-chrome .gc-topbar .gc-mark::before {
   content: "";
@@ -81,18 +89,18 @@ const CHROME_CSS = `
   height: 9px;
   background: var(--gc-blue);
   border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(196,118,27,0.18);
+  box-shadow: 0 0 0 2px rgba(70,115,175,0.30);
   display: inline-block;
 }
-#grounded-chrome .gc-topbar .gc-mark:hover { color: var(--gc-blue-deep); }
+#grounded-chrome .gc-topbar .gc-mark:hover { color: var(--gc-blue-light); }
 #grounded-chrome .gc-topbar .gc-context {
   font-size: 11px;
-  color: var(--gc-dim);
+  color: #A8B2CC;
   letter-spacing: 0.3px;
 }
 #grounded-chrome .gc-topbar .gc-context .gc-newsroom {
   font-weight: 600;
-  color: var(--gc-ink);
+  color: #E4E9F4;
   letter-spacing: 0.4px;
 }
 #grounded-chrome .gc-topbar .gc-context .gc-sep {
@@ -256,7 +264,7 @@ const CHROME_CSS = `
   overflow-y: auto;
   padding: 1.5rem 1.75rem 1.25rem;
   box-shadow: 0 18px 50px rgba(0,0,0,0.18);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Arimo', Arial, Helvetica, sans-serif;
 }
 #grounded-chrome .gc-modal h2 {
   margin: 0 0 0.35rem;

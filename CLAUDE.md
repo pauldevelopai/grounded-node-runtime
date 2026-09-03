@@ -3,17 +3,30 @@
 Shared scaffolding every GROUNDED Node builds on. Part of **Grounded** (newsroom-owned
 AI by Develop AI). A Node = a small app whose handlers target a **host interface**
 (`host.db / host.store / host.profile / host.corpus / host.ai / host.parse / host.log /
-host.feedback / host.meta / host.tablePrefix`) so the *same handlers* run three ways (local web / hosted multi-tenant / MCP tools). **Current tag: `v0.18.0`** (the tracker's
+host.feedback / host.meta / host.tablePrefix`) so the *same handlers* run three ways (local web / hosted multi-tenant / MCP tools). **Current tag: `v0.19.0`** (the tracker's
 `CLAUDE.md` is the source of truth if this line lags).
+
+## Local chrome wears the Develop AI palette (v0.19.0)
+`src/chrome.js` — the **local**-install chrome only — moved off terracotta/Inter onto the
+Develop AI system: navy `#1B1C3D` bar, steel-blue `#4673AF` rule and accent, an Oswald
+wordmark over Arimo. It now matches `client/src/index.css` in the tracker and `chrome.js`
+in the nodes repo, so all three surfaces read as one product. Deliberately still **no
+pillar nav here**: a locally-installed Node has no tracker at its own origin, so platform
+links would 404. The one link out is the wordmark.
 
 ## Hosted chrome — IMPORTANT (v0.10.0)
 `createHostedServer` no longer inlines the nav/feedback HTML. It injects ONE shared
 script — `<script src="/nodes/chrome.js" defer>` — served from the static front door
-(the `nodes` repo). That script renders the Builder/Tracker nav + the feedback & chat
+(the `nodes` repo). That script renders the platform nav + the feedback & chat
 bubbles identically on every surface (front door, hosted Nodes, and — matched in style —
 the React tracker). **To change the menu or bubbles, edit `nodes/chrome.js` and
 `git -C /var/www/nodes pull` on the box — no Node or runtime redeploy needed.** Only the
 Node-specific "run it locally" footer is still emitted by the runtime.
+
+Since 2026-09-03 that nav is not chrome.js's own list either: it **fetches
+`GET /api/public/nav`**, which the tracker derives from `pillars.js` — the same data the
+React shells render. One list, every surface. chrome.js keeps a fallback copy purely so
+the bar paints before the fetch lands.
 
 ## Exports (`src/index.js`)
 - **`createLiteHost({ appSlug, nodeVersion, newsroom })`** (`host-lite.js`) — local host: JSON files on disk, the user's own AI key. Plus a sticky `host.meta.host_id`.
